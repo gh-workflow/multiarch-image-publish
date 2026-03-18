@@ -1,0 +1,9 @@
+/.idea
+/.venv*/
+__pycache__/
+/artifacts
+dist/
+/node_modules/
+
+**/.coverage
+**/_version.py
