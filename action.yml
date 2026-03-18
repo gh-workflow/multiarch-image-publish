@@ -45,4 +45,3 @@ runs:
       run: |
         set -euo pipefail
         python3 -m multiarch_publish
-        done <<< "${{ inputs.tags }}"
