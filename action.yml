@@ -31,7 +31,7 @@ runs:
       uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22  # v4.1.0
 
     - name: Install regctl
-      uses: regclient/actions/regctl-installer@9f6c88d6bc9e9d8416282b1f88be43758b0d066a  # main
+      uses: regclient/actions/regctl-installer@1b705e32d40851370799ea5814e83d0a5f6a70dc  # v0.1.0
 
     - name: Run multi-arch publish
       id: publish
