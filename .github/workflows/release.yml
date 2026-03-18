@@ -21,48 +21,6 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22  # v4.1.0
-
-      - name: Package release artifacts
-        run: |
-          mkdir -p dist
-          REPO_NAME="${GITHUB_REPOSITORY##*/}"
-          tar -czf dist/"${REPO_NAME}".tar.gz \
-            --exclude='.github/workflows/release.yml' \
-            .github \
-            doc \
-            scripts \
-            src \
-            tests \
-            AGENTS.md \
-            LICENSE \
-            README.md \
-            action.yml \
-            pyproject.toml \
-            pyrightconfig.json \
-            pytest.ini \
-            requirements.txt \
-            requirements-dev.txt
-
-      - name: Create SHA256SUMS
-        run: |
-          cd dist
-          LC_ALL=C find . -maxdepth 1 -type f ! -name 'SHA256SUMS*' -print0 | \
-            sort -z | \
-            xargs -0 sha256sum \
-            > SHA256SUMS
-
-      - name: Keyless-sign SHA256SUMS
-        run: |
-          cd dist
-          cosign sign-blob --yes \
-            --bundle SHA256SUMS.sigstore.json \
-            SHA256SUMS
-
       - name: Create GitHub release
         uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe  # v2.6.1
         with:
@@ -70,4 +28,3 @@ jobs:
           tag_name: ${{ github.ref_name }}
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
-          files: dist/*
