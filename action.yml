@@ -22,171 +22,27 @@ inputs:
 outputs:
   manifest_digest:
     description: Published multi-arch manifest digest.
-    value: ${{ steps.publish-manifest.outputs.digest }}
+    value: ${{ steps.publish.outputs.manifest_digest }}
 
 runs:
   using: composite
   steps:
-    - name: Validate inputs
-      shell: bash
-      run: |
-        set -euo pipefail
-
-        if [[ -z "${{ inputs.tags }}" ]]; then
-          echo "tags input must not be empty" >&2
-          exit 1
-        fi
-
-        if [[ -z "${{ inputs.platform_digests }}" ]]; then
-          echo "platform_digests input must not be empty" >&2
-          exit 1
-        fi
-
-    - name: Resolve certificate identity policy
-      id: identity
-      shell: bash
-      run: |
-        set -euo pipefail
-
-        # Default trust should point at the caller repository's workflows, not
-        # at this shared action repository.
-        escaped_repo="$(printf '%s' "${GITHUB_REPOSITORY}" | sed 's/[][(){}.^$*+?|\\]/\\&/g')"
-        identity_regexp="^https://github\\.com/${escaped_repo}/\\.github/workflows/.*@(?:refs/.*/.*|[0-9a-f]{40})$"
-
-        echo "certificate_identity_regexp=${identity_regexp}" >> "${GITHUB_OUTPUT}"
-
-    - name: Validate and normalize platform list
-      id: platforms
-      shell: bash
-      run: |
-        set -euo pipefail
-
-        normalized_file="$(mktemp)"
-        count=0
-
-        while IFS= read -r entry; do
-          if [[ -z "${entry}" ]]; then
-            echo "platform_digests must not contain empty lines" >&2
-            exit 1
-          fi
-
-          if [[ "${entry}" != *=* ]]; then
-            echo "Invalid platform_digests entry: '${entry}'. Expected 'platform=digest'." >&2
-            exit 1
-          fi
-
-          platform="${entry%%=*}"
-          digest="${entry#*=}"
-
-          if [[ -z "${platform}" || -z "${digest}" ]]; then
-            echo "Invalid platform_digests entry: '${entry}'. Platform and digest must both be non-empty." >&2
-            exit 1
-          fi
-
-          if [[ "${platform}" != */* ]]; then
-            echo "Invalid platform '${platform}'. Expected format os/arch, for example linux/amd64." >&2
-            exit 1
-          fi
-
-          printf '%s=%s\n' "${platform}" "${digest}" >> "${normalized_file}"
-          count=$((count + 1))
-        done <<< "${{ inputs.platform_digests }}"
-
-        if [[ "${count}" -eq 0 ]]; then
-          echo "platform_digests must contain at least one platform=digest entry" >&2
-          exit 1
-        fi
-
-        {
-          echo "count=${count}"
-          echo "file=${normalized_file}"
-        } >> "${GITHUB_OUTPUT}"
-
     - name: Install Cosign
-      uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22 # v4.1.0
+      uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22  # v4.1.0
 
     - name: Install regctl
-      uses: regclient/actions/regctl-installer@9f6c88d6bc9e9d8416282b1f88be43758b0d066a # main
+      uses: regclient/actions/regctl-installer@9f6c88d6bc9e9d8416282b1f88be43758b0d066a  # main
 
-    - name: Verify, sign, and publish platform tags
+    - name: Run multi-arch publish
+      id: publish
       shell: bash
+      env:
+        PYTHONPATH: ${{ github.action_path }}/src
+        INPUT_IMAGE_REF: ${{ inputs.image_ref }}
+        INPUT_TAGS: ${{ inputs.tags }}
+        INPUT_PLATFORM_DIGESTS: ${{ inputs.platform_digests }}
+        INPUT_CERTIFICATE_OIDC_ISSUER: ${{ inputs.certificate_oidc_issuer }}
       run: |
         set -euo pipefail
-
-        while IFS= read -r entry; do
-          platform="${entry%%=*}"
-          index_digest="${entry#*=}"
-          platform_suffix="${platform#*/}"
-          platform_suffix="${platform_suffix//\//-}"
-
-          "${{ github.action_path }}/scripts/read-platform-digest.sh" \
-            "${{ inputs.image_ref }}@${index_digest}" \
-            "${platform}" \
-            > platform-digest.txt
-
-          platform_digest="$(sed -n 's/^digest=//p' platform-digest.txt)"
-          if [[ -z "${platform_digest}" ]]; then
-            echo "Failed to read platform digest for ${platform}" >&2
-            exit 1
-          fi
-
-          "${{ github.action_path }}/scripts/verify-image.sh" \
-            "${{ inputs.image_ref }}" \
-            "${index_digest}" \
-            "${platform_digest}" \
-            "${{ inputs.certificate_oidc_issuer }}" \
-            "${{ steps.identity.outputs.certificate_identity_regexp }}"
-
-          while IFS= read -r tag; do
-            if [[ -z "${tag}" ]]; then
-              echo "tags must not contain empty lines" >&2
-              exit 1
-            fi
-
-            docker buildx imagetools create \
-              --tag "${{ inputs.image_ref }}:${tag}-${platform_suffix}" \
-              "${{ inputs.image_ref }}@${index_digest}"
-          done <<< "${{ inputs.tags }}"
-        done < "${{ steps.platforms.outputs.file }}"
-
-    - name: Publish multi-arch manifest by digest
-      id: publish-manifest
-      shell: bash
-      run: |
-        set -euo pipefail
-        "${{ github.action_path }}/scripts/publish-manifest.sh" \
-          "${{ inputs.image_ref }}" \
-          "${{ steps.platforms.outputs.file }}" \
-          >> "${GITHUB_OUTPUT}"
-
-    - name: Sign multi-arch manifest digest
-      shell: bash
-      run: |
-        set -euo pipefail
-        cosign sign --yes \
-          "${{ inputs.image_ref }}@${{ steps.publish-manifest.outputs.digest }}"
-
-    - name: Verify multi-arch manifest signature
-      shell: bash
-      run: |
-        set -euo pipefail
-        cosign verify \
-          --certificate-oidc-issuer "${{ inputs.certificate_oidc_issuer }}" \
-          --certificate-identity-regexp "${{ steps.identity.outputs.certificate_identity_regexp }}" \
-          "${{ inputs.image_ref }}@${{ steps.publish-manifest.outputs.digest }}"
-
-    - name: Publish final multi-arch manifest tags
-      shell: bash
-      run: |
-        set -euo pipefail
-
-        while IFS= read -r tag; do
-          if [[ -z "${tag}" ]]; then
-            echo "tags must not contain empty lines" >&2
-            exit 1
-          fi
-
-          docker buildx imagetools create \
-            --tag "${{ inputs.image_ref }}:${tag}" \
-            "${{ inputs.image_ref }}@${{ steps.publish-manifest.outputs.digest }}"
+        python3 -m multiarch_publish
         done <<< "${{ inputs.tags }}"

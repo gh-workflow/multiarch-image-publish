@@ -14,11 +14,17 @@ This action is intended for workflows that already built and tested architecture
 
 For each provided tag, the action publishes:
 
-- `${tag}-amd64`
-- `${tag}-arm64`
+- `${tag}-<platform suffix>`
 - `${tag}`
 
-The action runs in the caller workflow context. That keeps OIDC-based signing identity anchored to the calling repository and workflow instead of a shared reusable workflow repository.
+For example:
+
+- `linux/amd64` becomes `${tag}-amd64`
+- `linux/arm/v7` becomes `${tag}-arm-v7`
+
+The action runs in the caller workflow context. That keeps OIDC-based signing
+identity anchored to the calling repository and workflow instead of a shared
+reusable workflow repository.
 
 ## Inputs
 
@@ -26,8 +32,10 @@ The action runs in the caller workflow context. That keeps OIDC-based signing id
 | --- | --- | --- |
 | `image_ref` | yes | Full image reference, for example `ghcr.io/acme/my-image`. |
 | `tags` | yes | Newline-separated list of tags to publish. |
-| `platform_digests` | yes | Newline-separated list of `platform=digest` entries, for example `linux/amd64=sha256:...`. |
-| `certificate_oidc_issuer` | no | Expected OIDC issuer for cosign verification. Default: `https://token.actions.githubusercontent.com`. |
+| `platform_digests` | yes | Newline-separated list of `platform=digest` entries, for example
+`linux/amd64=sha256:...`. |
+| `certificate_oidc_issuer` | no | Expected OIDC issuer for cosign verification. Default:
+`https://token.actions.githubusercontent.com`. |
 
 ## Outputs
 
@@ -42,9 +50,9 @@ The action runs in the caller workflow context. That keeps OIDC-based signing id
 - `contents: read`
 - Docker Buildx available on the runner
 - Registry login already performed in the job
-- `jq` available on the runner
+- Python 3 available on the runner
 
-On `ubuntu-latest`, `jq` is preinstalled. If your runner does not already have Docker Buildx configured, set it up earlier in the workflow.
+If your runner does not already have Docker Buildx configured, set it up earlier in the workflow.
 
 ## Example
 
