@@ -20,7 +20,7 @@ The built images are passed to the action as `platform=digest` entries.
 ```yaml
 - name: Publish multi-arch image
   id: publish
-  uses: gh-workflow/multiarch-image-publish@66d27df6e800ce58642ce65b15798c03d1f673b0  # 0.0.2
+  uses: gh-workflow/multiarch-image-publish@8e1cd7ed6d945ab406211187e9582237d2700ac4  # 0.0.4
   with:
     image_ref: ghcr.io/acme/my-image
     tags: |
