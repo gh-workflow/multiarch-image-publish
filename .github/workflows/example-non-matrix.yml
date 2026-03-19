@@ -33,7 +33,7 @@ jobs:
           push: true  # Push the arch image so provenance is published.
           provenance: true
           platforms: linux/amd64
-          tags: ghcr.io/acme/my-image:${{ github.sha }}-amd64-seed
+          tags: ghcr.io/acme/my-image:${{ github.sha }}-amd64-test
           # Temporary pushed tag for build/test; final tags are published later.
 
       - name: Test image
@@ -64,7 +64,7 @@ jobs:
           push: true  # Push the arch image so provenance is published.
           provenance: true
           platforms: linux/arm64
-          tags: ghcr.io/acme/my-image:${{ github.sha }}-arm64-seed
+          tags: ghcr.io/acme/my-image:${{ github.sha }}-arm64-test
           # Temporary pushed tag for build/test; final tags are published later.
 
       - name: Test image

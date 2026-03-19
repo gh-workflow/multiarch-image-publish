@@ -24,5 +24,5 @@ Audience: AI coding agents working in this repo.
 
 ## Linting and tests
 
-- Lint: `ruff check . && pyright && yamllint . && pymarkdown scan README.md doc AGENTS.md`
-- Tests: `pytest --cov=src --cov-report=term-missing`
+- Lint: `source .venv/bin/activate && ./scripts/lint.sh`
+- Tests: `source .venv/bin/activate && pytest --cov=src --cov-report=term-missing`

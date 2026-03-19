@@ -74,7 +74,7 @@ jobs:
         env:
           image_tag: >-
             ${{ needs.set-globals.outputs.image_ref }}:${{
-            needs.set-globals.outputs.tag_version }}-${{ matrix.arch }}-seed
+            needs.set-globals.outputs.tag_version }}-${{ matrix.arch }}-test
         with:
           context: tests/build
           file: tests/build/Dockerfile
