@@ -57,7 +57,6 @@ For each requested tag, the action publishes:
 - `id-token: write` for keyless `cosign` signing
 - `packages: write` for GHCR registries
 
-## Examples
+## Example Workflow
 
 - [.github/workflows/example.yml](.github/workflows/example.yml)
-- [.github/workflows/example-non-matrix.yml](.github/workflows/example-non-matrix.yml)
