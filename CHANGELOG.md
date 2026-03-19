@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Initial public release of the `multiarch-image-build-sign-provenance` GitHub Action.
+- Initial public release of the `multiarch-image-publish` GitHub Action.
 - Support for publishing a multi-arch manifest from already-built per-platform image digests.
 - Cosign signing and verification for per-platform image digests and the final multi-arch manifest digest.
 - Provenance presence verification on signed per-platform image digests before final publication.

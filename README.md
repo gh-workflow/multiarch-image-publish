@@ -1,4 +1,4 @@
-# multiarch-image-build-sign-provenance
+# multiarch-image-publish
 
 Reusable GitHub Action for publishing multi-arch container images with signature and provenance verification.
 
@@ -134,7 +134,7 @@ jobs:
 
       - name: Publish signed multi-arch image
         id: publish
-        uses: gh-workflow/multiarch-image-build-sign-provenance@v1
+        uses: gh-workflow/multiarch-image-publish@v1
         with:
           image_ref: ghcr.io/acme/my-image
           tags: |
