@@ -1,41 +1,49 @@
 # multiarch-image-publish
 
-Reusable GitHub Action for publishing multi-arch container images with signature and provenance verification.
+[![Release](https://img.shields.io/github/v/release/gh-workflow/multiarch-image-publish?style=flat-square)](https://github.com/gh-workflow/multiarch-image-publish/releases)
+[![Tests](https://img.shields.io/github/actions/workflow/status/gh-workflow/multiarch-image-publish/test-suite.yml?branch=main&label=test&style=flat-square)](https://github.com/gh-workflow/multiarch-image-publish/actions/workflows/test-suite.yml)
 
-This action is intended for workflows that already built and tested architecture-specific images and now want to:
+Publish a signed multi-arch container image from pre-built per-architecture
+images.
 
-- resolve platform digests for the provided image indexes
-- sign and verify the per-arch images with cosign
-- confirm provenance is present on the signed image digests
-- publish architecture-specific tags
-- publish a multi-arch manifest by digest
-- sign and verify the final multi-arch manifest
-- publish final tags for the multi-arch image
+Build and test each architecture in your workflow, then use this action to:
 
-For each provided tag, the action publishes:
+- publish per-platform tags such as `v1.2.3-amd64`
+- publish the final multi-arch tags such as `v1.2.3` and `latest`
+- sign and verify the platform images and final manifest
+- verify provenance on the signed architecture images
 
-- `${tag}-<platform suffix>`
-- `${tag}`
+The built images are passed to the action as `platform=digest` entries.
 
-For example:
+## Usage
 
-- `linux/amd64` becomes `${tag}-amd64`
-- `linux/arm/v7` becomes `${tag}-arm-v7`
+```yaml
+- name: Publish multi-arch image
+  id: publish
+  uses: gh-workflow/multiarch-image-publish@66d27df6e800ce58642ce65b15798c03d1f673b0  # 0.0.2
+  with:
+    image_ref: ghcr.io/acme/my-image
+    tags: |
+      ${{ github.ref_name }}
+      latest
+    platform_digests: |
+      linux/amd64=sha256:...
+      linux/arm64=sha256:...
+```
 
-The action runs in the caller workflow context. That keeps OIDC-based signing
-identity anchored to the calling repository and workflow instead of a shared
-reusable workflow repository.
+For each requested tag, the action publishes:
+
+- the multi-arch tag, for example `v1.2.3`
+- a tag on each arch image, for example `v1.2.3-amd64` or `v1.2.3-arm64`
 
 ## Inputs
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `image_ref` | yes | Full image reference, for example `ghcr.io/acme/my-image`. |
-| `tags` | yes | Newline-separated list of tags to publish. |
-| `platform_digests` | yes | Newline-separated list of `platform=digest` entries, for example
-`linux/amd64=sha256:...`. |
-| `certificate_oidc_issuer` | no | Expected OIDC issuer for cosign verification. Default:
-`https://token.actions.githubusercontent.com`. |
+| `image_ref` | yes | Image reference, for example `ghcr.io/acme/my-image`. |
+| `tags` | yes | Newline-separated tags to publish. |
+| `platform_digests` | yes | Newline-separated `platform=digest` entries. |
+| `certificate_oidc_issuer` | no | Expected issuer for cosign verification. |
 
 ## Outputs
 
@@ -45,109 +53,11 @@ reusable workflow repository.
 
 ## Requirements
 
-- `packages: write`
-- `id-token: write`
-- `contents: read`
-- Docker Buildx available on the runner
-- Registry login already performed in the job
-- Python 3 available on the runner
+- registry login already performed in the publishing job
+- `id-token: write` for keyless `cosign` signing
+- `packages: write` for GHCR registries
 
-If your runner does not already have Docker Buildx configured, set it up earlier in the workflow.
+## Examples
 
-## Example
-
-```yaml
-name: Build Image
-
-on:
-  push:
-    tags:
-      - "*"
-
-permissions:
-  contents: read
-  packages: write
-  id-token: write
-
-jobs:
-  build-amd64:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: docker/setup-buildx-action@v4
-        with:
-          driver: docker-container
-
-      - name: Build image
-        id: build
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          push: true
-          provenance: true
-          platforms: linux/amd64
-          tags: ghcr.io/acme/my-image:${{ github.sha }}-amd64-test
-
-    outputs:
-      digest: ${{ steps.build.outputs.digest }}
-
-  build-arm64:
-    runs-on: ubuntu-24.04-arm
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: docker/setup-buildx-action@v4
-        with:
-          driver: docker-container
-
-      - name: Build image
-        id: build
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          push: true
-          provenance: true
-          platforms: linux/arm64
-          tags: ghcr.io/acme/my-image:${{ github.sha }}-arm64-test
-
-    outputs:
-      digest: ${{ steps.build.outputs.digest }}
-
-  multiarch:
-    name: Publish multi-arch image
-    needs:
-      - build-amd64
-      - build-arm64
-    runs-on: ubuntu-latest
-    steps:
-      - name: Log in to registry
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: docker/setup-buildx-action@v4
-        with:
-          driver: docker-container
-
-      - name: Publish signed multi-arch image
-        id: publish
-        uses: gh-workflow/multiarch-image-publish@v1
-        with:
-          image_ref: ghcr.io/acme/my-image
-          tags: |
-            ${{ github.ref_name }}
-            latest
-          platform_digests: |
-            linux/amd64=${{ needs.build-amd64.outputs.digest }}
-            linux/arm64=${{ needs.build-arm64.outputs.digest }}
-```
-
-## Notes
-
-- This action assumes your per-architecture builds already pushed images and emitted their digests.
-- This action assumes the job is already logged in to the target registry.
-- Signature verification is bound to workflows in the calling repository.
-- The action accepts one or more `platform=digest` entries.
+- [.github/workflows/example.yml](.github/workflows/example.yml)
+- [.github/workflows/example-non-matrix.yml](.github/workflows/example-non-matrix.yml)

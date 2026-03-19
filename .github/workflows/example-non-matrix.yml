@@ -1,0 +1,97 @@
+name: publish
+
+"on":
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  build-amd64:
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd  # v4.0.0
+
+      - uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2  # v4.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: build
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294  # v7.0.0
+        with:
+          context: .
+          push: true  # Push the arch image so provenance is published.
+          provenance: true
+          platforms: linux/amd64
+          tags: ghcr.io/acme/my-image:${{ github.sha }}-amd64-seed
+          # Temporary pushed tag for build/test; final tags are published later.
+
+      - name: Test image
+        run: |
+          docker run --rm \
+            ghcr.io/acme/my-image@${{ steps.build.outputs.digest }} \
+            your-test-command
+
+  build-arm64:
+    runs-on: ubuntu-24.04-arm
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd  # v4.0.0
+
+      - uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2  # v4.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: build
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294  # v7.0.0
+        with:
+          context: .
+          push: true  # Push the arch image so provenance is published.
+          provenance: true
+          platforms: linux/arm64
+          tags: ghcr.io/acme/my-image:${{ github.sha }}-arm64-seed
+          # Temporary pushed tag for build/test; final tags are published later.
+
+      - name: Test image
+        run: |
+          docker run --rm \
+            ghcr.io/acme/my-image@${{ steps.build.outputs.digest }} \
+            your-test-command
+
+  publish:
+    needs:
+      - build-amd64
+      - build-arm64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2  # v4.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish multi-arch image
+        uses: gh-workflow/multiarch-image-publish@66d27df6e800ce58642ce65b15798c03d1f673b0  # 0.0.2
+        with:
+          image_ref: ghcr.io/acme/my-image
+          tags: |
+            ${{ github.ref_name }}
+            latest
+          platform_digests: |
+            linux/amd64=${{ needs.build-amd64.outputs.digest }}
+            linux/arm64=${{ needs.build-arm64.outputs.digest }}
