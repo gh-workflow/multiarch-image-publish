@@ -9,6 +9,8 @@ Audience: AI coding agents working in this repo.
 - KISS: default to minimal changes; avoid optional parameters/configs or extra result objects unless explicitly requested.
 - Visibility first: new modules default to private (`_`); keep constants private unless used outside the module.
 - Do not invent new public APIs or config fields unless explicitly requested.
+- Do not print `git diff` output or patch hunks in normal progress updates unless explicitly requested.
+- Summarize code changes briefly and rely on commit hashes, file paths, and test results instead.
 - For all Python commands, use a virtualenv:
   `python -m venv .venv && source .venv/bin/activate && pip install -r requirements-dev.txt`.
 - Respect [doc/python-test-structure-guidelines.md](doc/python-test-structure-guidelines.md).
