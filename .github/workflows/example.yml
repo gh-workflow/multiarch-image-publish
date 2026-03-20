@@ -3,6 +3,8 @@ name: Example Publish
 "on":
   # Quick-start mode: run this workflow manually from the GitHub UI.
   workflow_dispatch:
+  # Run from another workflow
+  workflow_call:
   # To publish automatically on Git tag pushes/releases, uncomment the
   # `push.tags` block below.
   # push:

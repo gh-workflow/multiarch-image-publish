@@ -10,140 +10,13 @@ permissions:
   id-token: write
 
 jobs:
-  set-globals:
-    name: Set global vars
-    runs-on: ubuntu-latest
-    outputs:
-      image_ref: ${{ steps.output-vars.outputs.image_ref }}
-      tag_version: ${{ steps.output-vars.outputs.tag_version }}
-      tag_purpose: ${{ steps.output-vars.outputs.tag_purpose }}
-      certificate_identity_regexp: ${{ steps.output-vars.outputs.certificate_identity_regexp }}
-    steps:
-      - name: Output global vars
-        id: output-vars
-        shell: bash
-        run: |
-          set -euo pipefail
-          owner="${GITHUB_REPOSITORY_OWNER,,}"
-          repo_name="${GITHUB_REPOSITORY#*/}"
-          unique="${GITHUB_SHA::7}-$(uuidgen)"
-          regex_prefix="^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/"
-          regex_suffix=".*@(?:refs/.*/.*|[0-9a-f]{40})$"
-          {
-            echo "image_ref=ghcr.io/${owner}/${repo_name}-e2e"
-            echo "tag_version=version-${unique}"
-            echo "tag_purpose=latest-${unique}"
-            echo "certificate_identity_regexp=${regex_prefix}${regex_suffix}"
-          } >> "$GITHUB_OUTPUT"
-
-  build:
-    name: Build image with provenance (${{ matrix.arch }})
-    runs-on: ${{ matrix.runner }}
-    needs: set-globals
-    strategy:
-      matrix:
-        include:
-          - arch: amd64
-            platform: linux/amd64
-            runner: ubuntu-latest
-          - arch: arm64
-            platform: linux/arm64
-            runner: ubuntu-24.04-arm
-    outputs:
-      index_digest_amd64: ${{ steps.out-amd64.outputs.index_digest }}
-      index_digest_arm64: ${{ steps.out-arm64.outputs.index_digest }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd  # v4.0.0
-        with:
-          driver: docker-container
-
-      - name: Log in to Docker Registry
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2  # v4.0.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build image
-        id: build-image
-        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294  # v7.0.0
-        env:
-          image_tag: >-
-            ${{ needs.set-globals.outputs.image_ref }}:${{
-            needs.set-globals.outputs.tag_version }}-${{ matrix.arch }}-test
-        with:
-          context: tests/build
-          file: tests/build/Dockerfile
-          push: true
-          provenance: true
-          platforms: ${{ matrix.platform }}
-          tags: |
-            ${{ env.image_tag }}
-
-      - name: Test image
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker run --rm \
-            "${{ needs.set-globals.outputs.image_ref }}@${{ steps.build-image.outputs.digest }}" \
-            sh -ec '
-              set -eu
-              grep -q "test-date:" /test.txt
-            '
-
-      - name: Export digest (amd64)
-        id: out-amd64
-        if: matrix.arch == 'amd64'
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "index_digest=${{ steps.build-image.outputs.digest }}" >> "$GITHUB_OUTPUT"
-
-      - name: Export digest (arm64)
-        id: out-arm64
-        if: matrix.arch == 'arm64'
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "index_digest=${{ steps.build-image.outputs.digest }}" >> "$GITHUB_OUTPUT"
-
-  multiarch:
-    name: Run multi-arch sign/provenance/publish
-    runs-on: ubuntu-latest
-    needs: [set-globals, build]
-    outputs:
-      manifest_digest: ${{ steps.publish.outputs.manifest_digest }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-
-      - name: Log in to Docker Registry
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2  # v4.0.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Use composite action
-        id: publish
-        uses: ./
-        with:
-          image_ref: ${{ needs.set-globals.outputs.image_ref }}
-          tags: |
-            ${{ needs.set-globals.outputs.tag_version }}
-            ${{ needs.set-globals.outputs.tag_purpose }}
-          platform_digests: |
-            linux/amd64=${{ needs.build.outputs.index_digest_amd64 }}
-            linux/arm64=${{ needs.build.outputs.index_digest_arm64 }}
+  example:
+    uses: ./.github/workflows/example.yml
 
   verify:
     name: Verify published result
     runs-on: ubuntu-latest
-    needs: [set-globals, build, multiarch]
+    needs: [example]
     steps:
       - name: Log in to Docker Registry
         uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2  # v4.0.0
@@ -159,26 +32,27 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          certificate_identity_regexp="^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*@(?:refs/.*/.*|[0-9a-f]{40})$"
           cosign verify \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-            --certificate-identity-regexp "${{ needs.set-globals.outputs.certificate_identity_regexp }}" \
-            "${{ needs.set-globals.outputs.image_ref }}@${{ needs.multiarch.outputs.manifest_digest }}"
+            --certificate-identity-regexp "${certificate_identity_regexp}" \
+            "${{ needs.example.outputs.image_ref }}@${{ needs.example.outputs.manifest_digest }}"
 
       - name: Verify final tags resolve to manifest digest
         shell: bash
         run: |
           set -euo pipefail
           for tag in \
-            "${{ needs.set-globals.outputs.tag_version }}" \
-            "${{ needs.set-globals.outputs.tag_purpose }}"
+            "${{ needs.example.outputs.version_tag }}" \
+            "${{ needs.example.outputs.latest_tag }}"
           do
             digest="$(
               docker buildx imagetools inspect \
                 --format '{{json .Manifest}}' \
-                "${{ needs.set-globals.outputs.image_ref }}:${tag}" \
+                "${{ needs.example.outputs.image_ref }}:${tag}" \
                 | jq -r '.digest'
             )"
-            test "$digest" = "${{ needs.multiarch.outputs.manifest_digest }}"
+            test "$digest" = "${{ needs.example.outputs.manifest_digest }}"
           done
 
       - name: Verify final manifest includes both platforms
@@ -186,7 +60,7 @@ jobs:
         run: |
           set -euo pipefail
           docker buildx imagetools inspect \
-            --raw "${{ needs.set-globals.outputs.image_ref }}@${{ needs.multiarch.outputs.manifest_digest }}" \
+            --raw "${{ needs.example.outputs.image_ref }}@${{ needs.example.outputs.manifest_digest }}" \
             | jq -e '
               .manifests as $manifests
               | any($manifests[]?; .platform.os == "linux" and .platform.architecture == "amd64")
@@ -200,14 +74,14 @@ jobs:
           amd64_digest="$(
             docker buildx imagetools inspect \
               --format '{{json .Manifest}}' \
-              "${{ needs.set-globals.outputs.image_ref }}:${{ needs.set-globals.outputs.tag_version }}-amd64" \
+              "${{ needs.example.outputs.image_ref }}:${{ needs.example.outputs.version_tag }}-amd64" \
               | jq -r '.digest'
           )"
           arm64_digest="$(
             docker buildx imagetools inspect \
               --format '{{json .Manifest}}' \
-              "${{ needs.set-globals.outputs.image_ref }}:${{ needs.set-globals.outputs.tag_version }}-arm64" \
+              "${{ needs.example.outputs.image_ref }}:${{ needs.example.outputs.version_tag }}-arm64" \
               | jq -r '.digest'
           )"
-          test "$amd64_digest" = "${{ needs.build.outputs.index_digest_amd64 }}"
-          test "$arm64_digest" = "${{ needs.build.outputs.index_digest_arm64 }}"
+          test "$amd64_digest" = "${{ needs.example.outputs.digest_amd64 }}"
+          test "$arm64_digest" = "${{ needs.example.outputs.digest_arm64 }}"
