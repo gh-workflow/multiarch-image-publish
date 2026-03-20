@@ -96,7 +96,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish multi-arch image
-        uses: gh-workflow/multiarch-image-publish@8e1cd7ed6d945ab406211187e9582237d2700ac4  # 0.0.4
+        uses: gh-workflow/multiarch-image-publish@0.0.5
         with:
           image_ref: ${{ env.IMAGE_REF }}
           # Image tag list:
