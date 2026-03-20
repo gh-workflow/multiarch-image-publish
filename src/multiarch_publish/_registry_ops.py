@@ -1,23 +1,31 @@
 """Operations that inspect, sign, verify, and publish container images."""
 
 import json
+import re
 
 from multiarch_publish._command_runner import run_command
 from multiarch_publish._errors import CommandError
 from multiarch_publish._models import PlatformDigest
 
+_MANIFEST_PUSH_DIGEST_RE = re.compile(r"with digest:\s*(sha256:[0-9a-f]{64})")
+
 
 def _inspect_raw_manifest(image_reference: str) -> dict:
     """Return the raw manifest JSON for an image reference."""
     raw_json = run_command(
-        ["docker", "buildx", "imagetools", "inspect", "--raw", image_reference]
+        ["regctl", "manifest", "get", image_reference, "--format", "raw-body"]
     )
     try:
         return json.loads(raw_json)
     except json.JSONDecodeError as exc:
         raise CommandError(
-            f"docker returned invalid JSON for image reference {image_reference}"
+            f"registry returned invalid JSON for image reference {image_reference}"
         ) from exc
+
+
+def _copy_image(source_ref: str, target_ref: str) -> None:
+    """Retag an existing image or index within a repository."""
+    run_command(["regctl", "image", "copy", source_ref, target_ref])
 
 
 def resolve_platform_manifest_digest(image_ref: str, entry: PlatformDigest) -> str:
@@ -104,48 +112,27 @@ def publish_platform_tags(
     image_ref: str, index_digest: str, tag_suffix: str, tags: list[str]
 ) -> None:
     """Publish one per-platform tag for each requested tag."""
-    target = f"{image_ref}@{index_digest}"
+    source_ref = f"{image_ref}@{index_digest}"
     for tag in tags:
-        run_command(
-            [
-                "docker",
-                "buildx",
-                "imagetools",
-                "create",
-                "--tag",
-                f"{image_ref}:{tag}-{tag_suffix}",
-                target,
-            ]
-        )
+        _copy_image(source_ref, f"{image_ref}:{tag}-{tag_suffix}")
 
 
 def publish_manifest_by_digest(image_ref: str, entries: list[PlatformDigest]) -> str:
     """Publish a multi-platform manifest by digest and return its digest."""
-    create_command = [
-        "docker",
-        "buildx",
-        "imagetools",
-        "create",
-        "--dry-run",
-        *[f"{image_ref}@{entry.digest}" for entry in entries],
-    ]
-    create_output = run_command(create_command)
-    digest = run_command(
+    run_command(
         [
-            "regctl",
+            "docker",
             "manifest",
-            "put",
-            "--by-digest",
+            "create",
             image_ref,
-            "--format",
-            "{{ ( .Manifest.GetDescriptor ).Digest }}",
-        ],
-        input_text=create_output,
-    ).strip()
-
-    if digest == "":
-        raise CommandError(f"failed to publish multi-arch manifest for {image_ref}")
-    return digest
+            *[f"{image_ref}@{entry.digest}" for entry in entries],
+        ]
+    )
+    push_output = run_command(["docker", "manifest", "push", image_ref])
+    matches = _MANIFEST_PUSH_DIGEST_RE.findall(push_output)
+    if matches:
+        return matches[-1]
+    raise CommandError(f"failed to parse pushed manifest digest for {image_ref}")
 
 
 def sign_and_verify_manifest(
@@ -173,16 +160,6 @@ def sign_and_verify_manifest(
 
 def publish_final_tags(image_ref: str, manifest_digest: str, tags: list[str]) -> None:
     """Attach the requested final tags to the multi-platform manifest digest."""
-    target = f"{image_ref}@{manifest_digest}"
+    source_ref = f"{image_ref}@{manifest_digest}"
     for tag in tags:
-        run_command(
-            [
-                "docker",
-                "buildx",
-                "imagetools",
-                "create",
-                "--tag",
-                f"{image_ref}:{tag}",
-                target,
-            ]
-        )
+        _copy_image(source_ref, f"{image_ref}:{tag}")

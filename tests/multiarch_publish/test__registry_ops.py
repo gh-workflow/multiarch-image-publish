@@ -30,7 +30,7 @@ class RegistryOpsTests(unittest.TestCase):
         with patch("multiarch_publish._registry_ops.run_command", return_value="not-json"):
             with self.assertRaisesRegex(
                 CommandError,
-                "docker returned invalid JSON for image reference ghcr.io/acme/test@sha256:index",
+                "registry returned invalid JSON for image reference ghcr.io/acme/test@sha256:index",
             ):
                 _inspect_raw_manifest("ghcr.io/acme/test@sha256:index")
 
@@ -194,24 +194,35 @@ class RegistryOpsTests(unittest.TestCase):
 
         with patch(
             "multiarch_publish._registry_ops.run_command",
-            side_effect=['{"schemaVersion":2}', "sha256:manifest"],
+            side_effect=[
+                "",
+                (
+                    "Pushed: ghcr.io/acme/test\n"
+                    "Digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n"
+                    "Pushed manifest list with digest: "
+                    "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                ),
+            ],
         ):
             digest = publish_manifest_by_digest("ghcr.io/acme/test", entries)
 
-        self.assertEqual(digest, "sha256:manifest")
+        self.assertEqual(
+            digest,
+            "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        )
 
-    def test_publish_manifest_by_digest_raises_when_digest_is_empty(self) -> None:
+    def test_publish_manifest_by_digest_raises_when_push_output_has_no_digest(self) -> None:
         entries = [
             PlatformDigest(Platform(os="linux", architecture="amd64"), "sha256:amd64"),
         ]
 
         with patch(
             "multiarch_publish._registry_ops.run_command",
-            side_effect=['{"schemaVersion":2}', "   "],
+            side_effect=["", "pushed"],
         ):
             with self.assertRaisesRegex(
                 CommandError,
-                "failed to publish multi-arch manifest for ghcr.io/acme/test",
+                "failed to parse pushed manifest digest for ghcr.io/acme/test",
             ):
                 publish_manifest_by_digest("ghcr.io/acme/test", entries)
 
@@ -275,11 +286,11 @@ class RegistryOpsTests(unittest.TestCase):
 
         command_strings = [" ".join(call.args[0]) for call in run_command_mock.call_args_list]
         self.assertIn(
-            "docker buildx imagetools create --tag ghcr.io/acme/test:v1-amd64 ghcr.io/acme/test@sha256:index",
+            "regctl image copy ghcr.io/acme/test@sha256:index ghcr.io/acme/test:v1-amd64",
             command_strings,
         )
         self.assertIn(
-            "docker buildx imagetools create --tag ghcr.io/acme/test:latest-amd64 ghcr.io/acme/test@sha256:index",
+            "regctl image copy ghcr.io/acme/test@sha256:index ghcr.io/acme/test:latest-amd64",
             command_strings,
         )
 
@@ -293,11 +304,11 @@ class RegistryOpsTests(unittest.TestCase):
 
         command_strings = [" ".join(call.args[0]) for call in run_command_mock.call_args_list]
         self.assertIn(
-            "docker buildx imagetools create --tag ghcr.io/acme/test:v1 ghcr.io/acme/test@sha256:manifest",
+            "regctl image copy ghcr.io/acme/test@sha256:manifest ghcr.io/acme/test:v1",
             command_strings,
         )
         self.assertIn(
-            "docker buildx imagetools create --tag ghcr.io/acme/test:latest ghcr.io/acme/test@sha256:manifest",
+            "regctl image copy ghcr.io/acme/test@sha256:manifest ghcr.io/acme/test:latest",
             command_strings,
         )
 
