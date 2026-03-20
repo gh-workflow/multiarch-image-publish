@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.5] - 2026-03-20
+
+### Fixed
+
+- Delayed publication of final per-platform tags until after the multi-arch manifest has been published, signed,
+  and verified to avoid partial releases when manifest validation fails.
+
+### Internal
+
+- Expanded unit test coverage for registry operations, including manifest inspection errors, platform digest
+  resolution failures, attestation resolution, provenance validation, and empty manifest publish results.
+
 ## [0.0.3] - 2026-03-19
 
 ### Changed
