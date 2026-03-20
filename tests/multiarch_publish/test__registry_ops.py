@@ -8,6 +8,7 @@ from multiarch_publish._registry_ops import (
     _PlatformVerificationDigests,
     _resolve_attestation_digest,
     _resolve_platform_manifest_digest,
+    _run_verify_command,
     _verify_attestation_contains_provenance,
     publish_final_tags,
     publish_manifest_by_digest,
@@ -274,6 +275,26 @@ class RegistryOpsTests(unittest.TestCase):
                 "failed to resolve pushed manifest digest for ghcr.io/acme/test",
             ):
                 publish_manifest_by_digest("ghcr.io/acme/test", entries)
+
+    def test_run_verify_command_retries_no_signatures_found(self) -> None:
+        with patch(
+            "multiarch_publish._registry_ops.run_command",
+            side_effect=[CommandError("command failed: cosign verify\nno signatures found"), ""],
+        ) as run_command_mock, patch("multiarch_publish._registry_ops.time.sleep") as sleep_mock:
+            _run_verify_command(["cosign", "verify", "ghcr.io/acme/test@sha256:manifest"])
+
+        self.assertEqual(run_command_mock.call_count, 2)
+        sleep_mock.assert_called_once_with(5)
+
+    def test_run_verify_command_does_not_retry_other_errors(self) -> None:
+        with patch(
+            "multiarch_publish._registry_ops.run_command",
+            side_effect=CommandError("command failed: cosign verify\nunauthorized"),
+        ), patch("multiarch_publish._registry_ops.time.sleep") as sleep_mock:
+            with self.assertRaisesRegex(CommandError, "unauthorized"):
+                _run_verify_command(["cosign", "verify", "ghcr.io/acme/test@sha256:manifest"])
+
+        sleep_mock.assert_not_called()
 
     def test_sign_and_verify_platform_image_checks_attestation(self) -> None:
         with patch(

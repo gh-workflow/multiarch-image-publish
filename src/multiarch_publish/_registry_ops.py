@@ -1,17 +1,40 @@
 """Operations that inspect, sign, verify, and publish container images."""
 
 import json
+import time
 from dataclasses import dataclass
 
 from multiarch_publish._command_runner import run_command
 from multiarch_publish._errors import CommandError
 from multiarch_publish._models import PlatformDigest
 
+_VERIFY_RETRY_ATTEMPTS = 5
+_VERIFY_RETRY_DELAY_SECONDS = 5
+
 
 @dataclass(frozen=True)
 class _PlatformVerificationDigests:
     platform_digest: str
     attestation_digest: str
+
+
+def _run_verify_command(command: list[str]) -> None:
+    """Retry transient cosign verification failures caused by registry propagation."""
+    last_error: CommandError | None = None
+    for attempt in range(_VERIFY_RETRY_ATTEMPTS):
+        try:
+            run_command(command)
+            return
+        except CommandError as exc:
+            if "no signatures found" not in str(exc):
+                raise
+            last_error = exc
+            if attempt == _VERIFY_RETRY_ATTEMPTS - 1:
+                raise
+            time.sleep(_VERIFY_RETRY_DELAY_SECONDS)
+
+    if last_error is not None:
+        raise last_error
 
 
 def _inspect_raw_manifest(image_reference: str) -> dict:
@@ -148,8 +171,8 @@ def sign_and_verify_platform_image(
         "--certificate-identity-regexp",
         certificate_identity_regexp,
     ]
-    run_command([*verify_command, index_image])
-    run_command([*verify_command, platform_image])
+    _run_verify_command([*verify_command, index_image])
+    _run_verify_command([*verify_command, platform_image])
 
     _verify_attestation_contains_provenance(image_ref, digests.attestation_digest)
 
@@ -191,7 +214,7 @@ def sign_and_verify_manifest(
     """Sign and verify the final multi-platform manifest."""
     target = f"{image_ref}@{manifest_digest}"
     run_command(["cosign", "sign", "--yes", target])
-    run_command(
+    _run_verify_command(
         [
             "cosign",
             "verify",
