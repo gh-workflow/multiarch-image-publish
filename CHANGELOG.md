@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.6] - 2026-03-20
+
+### Changed
+
+- Refined the README quickstart and usage guidance to make the example workflow easier to copy, customize, and
+  understand.
+- Simplified the end-to-end workflow by reusing the example publish workflow.
+
+### Internal
+
+- Added a release-time check that requires action references to match the tag currently being released.
+
 ## [0.0.5] - 2026-03-20
 
 ### Fixed
