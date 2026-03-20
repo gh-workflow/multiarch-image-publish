@@ -1,14 +1,11 @@
 """Operations that inspect, sign, verify, and publish container images."""
 
 import json
-import re
 from dataclasses import dataclass
 
 from multiarch_publish._command_runner import run_command
 from multiarch_publish._errors import CommandError
 from multiarch_publish._models import PlatformDigest
-
-_MANIFEST_PUSH_DIGEST_RE = re.compile(r"with digest:\s*(sha256:[0-9a-f]{64})")
 
 
 @dataclass(frozen=True)
@@ -177,11 +174,11 @@ def publish_manifest_by_digest(image_ref: str, entries: list[PlatformDigest]) ->
             *[f"{image_ref}@{entry.digest}" for entry in entries],
         ]
     )
-    push_output = run_command(["docker", "manifest", "push", image_ref])
-    matches = _MANIFEST_PUSH_DIGEST_RE.findall(push_output)
-    if matches:
-        return matches[-1]
-    raise CommandError(f"failed to parse pushed manifest digest for {image_ref}")
+    run_command(["docker", "manifest", "push", image_ref])
+    digest = run_command(["regctl", "image", "digest", image_ref]).strip()
+    if digest:
+        return digest
+    raise CommandError(f"failed to resolve pushed manifest digest for {image_ref}")
 
 
 def sign_and_verify_manifest(

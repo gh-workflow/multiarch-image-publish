@@ -249,12 +249,8 @@ class RegistryOpsTests(unittest.TestCase):
             "multiarch_publish._registry_ops.run_command",
             side_effect=[
                 "",
-                (
-                    "Pushed: ghcr.io/acme/test\n"
-                    "Digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n"
-                    "Pushed manifest list with digest: "
-                    "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-                ),
+                "",
+                "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             ],
         ):
             digest = publish_manifest_by_digest("ghcr.io/acme/test", entries)
@@ -264,18 +260,18 @@ class RegistryOpsTests(unittest.TestCase):
             "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         )
 
-    def test_publish_manifest_by_digest_raises_when_push_output_has_no_digest(self) -> None:
+    def test_publish_manifest_by_digest_raises_when_digest_lookup_is_empty(self) -> None:
         entries = [
             PlatformDigest(Platform(os="linux", architecture="amd64"), "sha256:amd64"),
         ]
 
         with patch(
             "multiarch_publish._registry_ops.run_command",
-            side_effect=["", "pushed"],
+            side_effect=["", "", "  "],
         ):
             with self.assertRaisesRegex(
                 CommandError,
-                "failed to parse pushed manifest digest for ghcr.io/acme/test",
+                "failed to resolve pushed manifest digest for ghcr.io/acme/test",
             ):
                 publish_manifest_by_digest("ghcr.io/acme/test", entries)
 
