@@ -2,12 +2,19 @@
 
 import json
 import re
+from dataclasses import dataclass
 
 from multiarch_publish._command_runner import run_command
 from multiarch_publish._errors import CommandError
 from multiarch_publish._models import PlatformDigest
 
 _MANIFEST_PUSH_DIGEST_RE = re.compile(r"with digest:\s*(sha256:[0-9a-f]{64})")
+
+
+@dataclass(frozen=True)
+class _PlatformVerificationDigests:
+    platform_digest: str
+    attestation_digest: str
 
 
 def _inspect_raw_manifest(image_reference: str) -> dict:
@@ -28,7 +35,7 @@ def _copy_image(source_ref: str, target_ref: str) -> None:
     run_command(["regctl", "image", "copy", source_ref, target_ref])
 
 
-def resolve_platform_manifest_digest(image_ref: str, entry: PlatformDigest) -> str:
+def _resolve_platform_manifest_digest(image_ref: str, entry: PlatformDigest) -> str:
     """Resolve the platform-specific manifest digest inside a pushed image index."""
     manifest = _inspect_raw_manifest(f"{image_ref}@{entry.digest}")
     for candidate in manifest.get("manifests", []):
@@ -48,6 +55,49 @@ def resolve_platform_manifest_digest(image_ref: str, entry: PlatformDigest) -> s
 
     raise CommandError(
         f"failed to resolve platform digest for {image_ref}@{entry.digest} ({entry.platform})"
+    )
+
+
+def resolve_platform_verification_digests(
+    image_ref: str, entry: PlatformDigest
+) -> _PlatformVerificationDigests:
+    """Resolve the platform manifest and attestation digests from one index fetch."""
+    manifest = _inspect_raw_manifest(f"{image_ref}@{entry.digest}")
+    platform_digest = ""
+    attestation_digest = ""
+
+    for candidate in manifest.get("manifests", []):
+        annotations = candidate.get("annotations", {})
+        if annotations.get("vnd.docker.reference.type") == "attestation-manifest":
+            digest = candidate.get("digest", "")
+            if digest:
+                attestation_digest = digest
+            continue
+
+        platform_info = candidate.get("platform", {})
+        if platform_info.get("os") != entry.platform.os:
+            continue
+        if platform_info.get("architecture") != entry.platform.architecture:
+            continue
+
+        candidate_variant = platform_info.get("variant")
+        if entry.platform.variant is not None and candidate_variant != entry.platform.variant:
+            continue
+
+        digest = candidate.get("digest", "")
+        if digest:
+            platform_digest = digest
+
+    if platform_digest == "":
+        raise CommandError(
+            f"failed to resolve platform digest for {image_ref}@{entry.digest} ({entry.platform})"
+        )
+    if attestation_digest == "":
+        raise CommandError(f"failed to resolve attestation digest for {image_ref}@{entry.digest}")
+
+    return _PlatformVerificationDigests(
+        platform_digest=platform_digest,
+        attestation_digest=attestation_digest,
     )
 
 
@@ -81,14 +131,14 @@ def _verify_attestation_contains_provenance(image_ref: str, attestation_digest: 
 def sign_and_verify_platform_image(
     image_ref: str,
     index_digest: str,
-    platform_digest: str,
+    digests: _PlatformVerificationDigests,
     *,
     certificate_oidc_issuer: str,
     certificate_identity_regexp: str,
 ) -> None:
     """Sign and verify the pushed index digest and resolved platform manifest digest."""
     index_image = f"{image_ref}@{index_digest}"
-    platform_image = f"{image_ref}@{platform_digest}"
+    platform_image = f"{image_ref}@{digests.platform_digest}"
 
     run_command(["cosign", "sign", "--yes", index_image])
     run_command(["cosign", "sign", "--yes", platform_image])
@@ -104,8 +154,7 @@ def sign_and_verify_platform_image(
     run_command([*verify_command, index_image])
     run_command([*verify_command, platform_image])
 
-    attestation_digest = _resolve_attestation_digest(index_image)
-    _verify_attestation_contains_provenance(image_ref, attestation_digest)
+    _verify_attestation_contains_provenance(image_ref, digests.attestation_digest)
 
 
 def publish_platform_tags(

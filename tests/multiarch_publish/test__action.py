@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from multiarch_publish._action import _run_action, main
 from multiarch_publish._models import Platform, PlatformDigest
+from multiarch_publish._registry_ops import _PlatformVerificationDigests
 
 
 class ActionTests(unittest.TestCase):
@@ -20,8 +21,11 @@ class ActionTests(unittest.TestCase):
                 "GITHUB_OUTPUT": str(output_file),
             }
             with patch.dict("os.environ", env, clear=False), patch(
-                "multiarch_publish._action.resolve_platform_manifest_digest",
-                return_value="sha256:platform",
+                "multiarch_publish._action.resolve_platform_verification_digests",
+                return_value=_PlatformVerificationDigests(
+                    platform_digest="sha256:platform",
+                    attestation_digest="sha256:attestation",
+                ),
             ), patch(
                 "multiarch_publish._action.sign_and_verify_platform_image",
                 return_value=None,
@@ -72,8 +76,17 @@ class ActionTests(unittest.TestCase):
             "multiarch_publish._action.parse_platform_digests",
             return_value=entries,
         ), patch(
-            "multiarch_publish._action.resolve_platform_manifest_digest",
-            side_effect=["sha256:platform-amd64", "sha256:platform-arm64"],
+            "multiarch_publish._action.resolve_platform_verification_digests",
+            side_effect=[
+                _PlatformVerificationDigests(
+                    platform_digest="sha256:platform-amd64",
+                    attestation_digest="sha256:attestation-amd64",
+                ),
+                _PlatformVerificationDigests(
+                    platform_digest="sha256:platform-arm64",
+                    attestation_digest="sha256:attestation-arm64",
+                ),
+            ],
         ), patch(
             "multiarch_publish._action.sign_and_verify_platform_image",
             side_effect=lambda **_: call_order.append("platform"),
@@ -102,6 +115,64 @@ class ActionTests(unittest.TestCase):
                 "platform-tag",
                 "platform-tag",
                 "final-tag",
+            ],
+        )
+
+    def test_run_action_builds_final_manifest_from_resolved_platform_digests(self) -> None:
+        output_file = Path(tempfile.gettempdir()) / "github-output-manifest-inputs.txt"
+        env = {
+            "INPUT_IMAGE_REF": "ghcr.io/acme/test",
+            "INPUT_TAGS": "latest",
+            "INPUT_PLATFORM_DIGESTS": "linux/amd64=sha256:index-amd64\nlinux/arm64=sha256:index-arm64",
+            "INPUT_CERTIFICATE_OIDC_ISSUER": "https://token.actions.githubusercontent.com",
+            "GITHUB_REPOSITORY": "acme/test",
+            "GITHUB_OUTPUT": str(output_file),
+        }
+        entries = [
+            PlatformDigest(Platform(os="linux", architecture="amd64"), "sha256:index-amd64"),
+            PlatformDigest(Platform(os="linux", architecture="arm64"), "sha256:index-arm64"),
+        ]
+
+        with patch.dict("os.environ", env, clear=False), patch(
+            "multiarch_publish._action.parse_platform_digests",
+            return_value=entries,
+        ), patch(
+            "multiarch_publish._action.resolve_platform_verification_digests",
+            side_effect=[
+                _PlatformVerificationDigests(
+                    platform_digest="sha256:manifest-amd64",
+                    attestation_digest="sha256:attestation-amd64",
+                ),
+                _PlatformVerificationDigests(
+                    platform_digest="sha256:manifest-arm64",
+                    attestation_digest="sha256:attestation-arm64",
+                ),
+            ],
+        ), patch(
+            "multiarch_publish._action.sign_and_verify_platform_image",
+            return_value=None,
+        ), patch(
+            "multiarch_publish._action.publish_manifest_by_digest",
+            return_value="sha256:manifest",
+        ) as publish_manifest_mock, patch(
+            "multiarch_publish._action.sign_and_verify_manifest",
+            return_value=None,
+        ), patch(
+            "multiarch_publish._action.publish_platform_tags",
+            return_value=None,
+        ), patch(
+            "multiarch_publish._action.publish_final_tags",
+            return_value=None,
+        ):
+            _run_action()
+
+        publish_manifest_mock.assert_called_once()
+        manifest_entries = publish_manifest_mock.call_args.args[1]
+        self.assertEqual(
+            manifest_entries,
+            [
+                PlatformDigest(Platform(os="linux", architecture="amd64"), "sha256:manifest-amd64"),
+                PlatformDigest(Platform(os="linux", architecture="arm64"), "sha256:manifest-arm64"),
             ],
         )
 

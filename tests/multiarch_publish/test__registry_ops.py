@@ -5,12 +5,14 @@ from multiarch_publish._errors import CommandError
 from multiarch_publish._models import Platform, PlatformDigest
 from multiarch_publish._registry_ops import (
     _inspect_raw_manifest,
+    _PlatformVerificationDigests,
     _resolve_attestation_digest,
+    _resolve_platform_manifest_digest,
     _verify_attestation_contains_provenance,
     publish_final_tags,
     publish_manifest_by_digest,
     publish_platform_tags,
-    resolve_platform_manifest_digest,
+    resolve_platform_verification_digests,
     sign_and_verify_manifest,
     sign_and_verify_platform_image,
 )
@@ -56,7 +58,7 @@ class RegistryOpsTests(unittest.TestCase):
             "multiarch_publish._registry_ops._inspect_raw_manifest",
             return_value=manifest,
         ):
-            digest = resolve_platform_manifest_digest("ghcr.io/acme/test", entry)
+            digest = _resolve_platform_manifest_digest("ghcr.io/acme/test", entry)
 
         self.assertEqual(digest, "sha256:match")
 
@@ -90,7 +92,7 @@ class RegistryOpsTests(unittest.TestCase):
                 CommandError,
                 "failed to resolve platform digest for ghcr.io/acme/test@sha256:index",
             ):
-                resolve_platform_manifest_digest("ghcr.io/acme/test", entry)
+                _resolve_platform_manifest_digest("ghcr.io/acme/test", entry)
 
     def test_resolve_platform_manifest_digest_skips_non_matching_os(self) -> None:
         entry = PlatformDigest(
@@ -114,7 +116,7 @@ class RegistryOpsTests(unittest.TestCase):
             "multiarch_publish._registry_ops._inspect_raw_manifest",
             return_value=manifest,
         ):
-            digest = resolve_platform_manifest_digest("ghcr.io/acme/test", entry)
+            digest = _resolve_platform_manifest_digest("ghcr.io/acme/test", entry)
 
         self.assertEqual(digest, "sha256:linux")
 
@@ -150,6 +152,57 @@ class RegistryOpsTests(unittest.TestCase):
                 "failed to resolve attestation digest for ghcr.io/acme/test@sha256:index",
             ):
                 _resolve_attestation_digest("ghcr.io/acme/test@sha256:index")
+
+    def test_resolve_platform_verification_digests_returns_both_digests(self) -> None:
+        entry = PlatformDigest(
+            platform=Platform(os="linux", architecture="arm64"),
+            digest="sha256:index",
+        )
+        manifest = {
+            "manifests": [
+                {
+                    "platform": {"os": "linux", "architecture": "arm64"},
+                    "digest": "sha256:platform",
+                },
+                {
+                    "annotations": {"vnd.docker.reference.type": "attestation-manifest"},
+                    "digest": "sha256:attestation",
+                },
+            ]
+        }
+
+        with patch(
+            "multiarch_publish._registry_ops._inspect_raw_manifest",
+            return_value=manifest,
+        ):
+            digests = resolve_platform_verification_digests("ghcr.io/acme/test", entry)
+
+        self.assertEqual(digests.platform_digest, "sha256:platform")
+        self.assertEqual(digests.attestation_digest, "sha256:attestation")
+
+    def test_resolve_platform_verification_digests_raises_when_attestation_missing(self) -> None:
+        entry = PlatformDigest(
+            platform=Platform(os="linux", architecture="arm64"),
+            digest="sha256:index",
+        )
+        manifest = {
+            "manifests": [
+                {
+                    "platform": {"os": "linux", "architecture": "arm64"},
+                    "digest": "sha256:platform",
+                }
+            ]
+        }
+
+        with patch(
+            "multiarch_publish._registry_ops._inspect_raw_manifest",
+            return_value=manifest,
+        ):
+            with self.assertRaisesRegex(
+                CommandError,
+                "failed to resolve attestation digest for ghcr.io/acme/test@sha256:index",
+            ):
+                resolve_platform_verification_digests("ghcr.io/acme/test", entry)
 
     def test_verify_attestation_contains_provenance_accepts_slsa_predicate(self) -> None:
         manifest = {
@@ -231,16 +284,16 @@ class RegistryOpsTests(unittest.TestCase):
             "multiarch_publish._registry_ops.run_command",
             return_value="",
         ) as run_command_mock, patch(
-            "multiarch_publish._registry_ops._resolve_attestation_digest",
-            return_value="sha256:attestation",
-        ), patch(
             "multiarch_publish._registry_ops._verify_attestation_contains_provenance",
             return_value=None,
         ) as verify_attestation_mock:
             sign_and_verify_platform_image(
                 image_ref="ghcr.io/acme/test",
                 index_digest="sha256:index",
-                platform_digest="sha256:platform",
+                digests=_PlatformVerificationDigests(
+                    platform_digest="sha256:platform",
+                    attestation_digest="sha256:attestation",
+                ),
                 certificate_oidc_issuer="https://token.actions.githubusercontent.com",
                 certificate_identity_regexp="^https://github\\.com/acme/test/",
             )
