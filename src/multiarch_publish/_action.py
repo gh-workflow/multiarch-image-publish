@@ -54,12 +54,6 @@ def _run_action() -> str:
             certificate_oidc_issuer=certificate_oidc_issuer,
             certificate_identity_regexp=certificate_identity_regexp,
         )
-        publish_platform_tags(
-            image_ref=image_ref,
-            index_digest=entry.digest,
-            tag_suffix=entry.platform.tag_suffix,
-            tags=tags,
-        )
 
     manifest_digest = publish_manifest_by_digest(image_ref, entries)
     sign_and_verify_manifest(
@@ -68,6 +62,13 @@ def _run_action() -> str:
         certificate_oidc_issuer=certificate_oidc_issuer,
         certificate_identity_regexp=certificate_identity_regexp,
     )
+    for entry in entries:
+        publish_platform_tags(
+            image_ref=image_ref,
+            index_digest=entry.digest,
+            tag_suffix=entry.platform.tag_suffix,
+            tags=tags,
+        )
     publish_final_tags(image_ref, manifest_digest, tags)
 
     write_output("manifest_digest", manifest_digest)
