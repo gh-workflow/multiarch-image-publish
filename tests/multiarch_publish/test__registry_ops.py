@@ -1,8 +1,12 @@
 import unittest
 from unittest.mock import patch
 
+from multiarch_publish._errors import CommandError
 from multiarch_publish._models import Platform, PlatformDigest
 from multiarch_publish._registry_ops import (
+    _inspect_raw_manifest,
+    _resolve_attestation_digest,
+    _verify_attestation_contains_provenance,
     publish_final_tags,
     publish_manifest_by_digest,
     publish_platform_tags,
@@ -13,6 +17,23 @@ from multiarch_publish._registry_ops import (
 
 
 class RegistryOpsTests(unittest.TestCase):
+    def test_inspect_raw_manifest_returns_decoded_json(self) -> None:
+        with patch(
+            "multiarch_publish._registry_ops.run_command",
+            return_value='{"schemaVersion": 2}',
+        ):
+            manifest = _inspect_raw_manifest("ghcr.io/acme/test@sha256:index")
+
+        self.assertEqual(manifest, {"schemaVersion": 2})
+
+    def test_inspect_raw_manifest_raises_command_error_on_invalid_json(self) -> None:
+        with patch("multiarch_publish._registry_ops.run_command", return_value="not-json"):
+            with self.assertRaisesRegex(
+                CommandError,
+                "docker returned invalid JSON for image reference ghcr.io/acme/test@sha256:index",
+            ):
+                _inspect_raw_manifest("ghcr.io/acme/test@sha256:index")
+
     def test_resolve_platform_manifest_digest_returns_matching_digest(self) -> None:
         entry = PlatformDigest(
             platform=Platform(os="linux", architecture="arm", variant="v7"),
@@ -39,6 +60,132 @@ class RegistryOpsTests(unittest.TestCase):
 
         self.assertEqual(digest, "sha256:match")
 
+    def test_resolve_platform_manifest_digest_raises_when_no_candidate_matches(self) -> None:
+        entry = PlatformDigest(
+            platform=Platform(os="linux", architecture="arm", variant="v7"),
+            digest="sha256:index",
+        )
+        manifest = {
+            "manifests": [
+                {
+                    "platform": {"os": "linux", "architecture": "amd64"},
+                    "digest": "sha256:other",
+                },
+                {
+                    "platform": {"os": "linux", "architecture": "arm", "variant": "v6"},
+                    "digest": "sha256:wrong-variant",
+                },
+                {
+                    "platform": {"os": "linux", "architecture": "arm", "variant": "v7"},
+                    "digest": "",
+                },
+            ]
+        }
+
+        with patch(
+            "multiarch_publish._registry_ops._inspect_raw_manifest",
+            return_value=manifest,
+        ):
+            with self.assertRaisesRegex(
+                CommandError,
+                "failed to resolve platform digest for ghcr.io/acme/test@sha256:index",
+            ):
+                resolve_platform_manifest_digest("ghcr.io/acme/test", entry)
+
+    def test_resolve_platform_manifest_digest_skips_non_matching_os(self) -> None:
+        entry = PlatformDigest(
+            platform=Platform(os="linux", architecture="arm64"),
+            digest="sha256:index",
+        )
+        manifest = {
+            "manifests": [
+                {
+                    "platform": {"os": "windows", "architecture": "arm64"},
+                    "digest": "sha256:windows",
+                },
+                {
+                    "platform": {"os": "linux", "architecture": "arm64"},
+                    "digest": "sha256:linux",
+                },
+            ]
+        }
+
+        with patch(
+            "multiarch_publish._registry_ops._inspect_raw_manifest",
+            return_value=manifest,
+        ):
+            digest = resolve_platform_manifest_digest("ghcr.io/acme/test", entry)
+
+        self.assertEqual(digest, "sha256:linux")
+
+    def test_resolve_attestation_digest_returns_attestation_manifest_digest(self) -> None:
+        manifest = {
+            "manifests": [
+                {
+                    "annotations": {"vnd.docker.reference.type": "sbom"},
+                    "digest": "sha256:sbom",
+                },
+                {
+                    "annotations": {"vnd.docker.reference.type": "attestation-manifest"},
+                    "digest": "sha256:attestation",
+                },
+            ]
+        }
+
+        with patch(
+            "multiarch_publish._registry_ops._inspect_raw_manifest",
+            return_value=manifest,
+        ):
+            digest = _resolve_attestation_digest("ghcr.io/acme/test@sha256:index")
+
+        self.assertEqual(digest, "sha256:attestation")
+
+    def test_resolve_attestation_digest_raises_when_missing(self) -> None:
+        with patch(
+            "multiarch_publish._registry_ops._inspect_raw_manifest",
+            return_value={"manifests": []},
+        ):
+            with self.assertRaisesRegex(
+                CommandError,
+                "failed to resolve attestation digest for ghcr.io/acme/test@sha256:index",
+            ):
+                _resolve_attestation_digest("ghcr.io/acme/test@sha256:index")
+
+    def test_verify_attestation_contains_provenance_accepts_slsa_predicate(self) -> None:
+        manifest = {
+            "layers": [
+                {
+                    "annotations": {
+                        "in-toto.io/predicate-type": "https://slsa.dev/provenance/v1",
+                    }
+                }
+            ]
+        }
+
+        with patch(
+            "multiarch_publish._registry_ops._inspect_raw_manifest",
+            return_value=manifest,
+        ):
+            _verify_attestation_contains_provenance("ghcr.io/acme/test", "sha256:attestation")
+
+    def test_verify_attestation_contains_provenance_raises_without_provenance(self) -> None:
+        manifest = {
+            "layers": [
+                {"annotations": {"in-toto.io/predicate-type": "https://example.com/other"}},
+                {"annotations": {}},
+            ]
+        }
+
+        with patch(
+            "multiarch_publish._registry_ops._inspect_raw_manifest",
+            return_value=manifest,
+        ):
+            with self.assertRaisesRegex(
+                CommandError,
+                "does not contain an in-toto provenance predicate",
+            ):
+                _verify_attestation_contains_provenance("ghcr.io/acme/test", "sha256:attestation")
+
     def test_publish_manifest_by_digest_returns_digest(self) -> None:
         entries = [
             PlatformDigest(Platform(os="linux", architecture="amd64"), "sha256:amd64"),
@@ -52,6 +199,21 @@ class RegistryOpsTests(unittest.TestCase):
             digest = publish_manifest_by_digest("ghcr.io/acme/test", entries)
 
         self.assertEqual(digest, "sha256:manifest")
+
+    def test_publish_manifest_by_digest_raises_when_digest_is_empty(self) -> None:
+        entries = [
+            PlatformDigest(Platform(os="linux", architecture="amd64"), "sha256:amd64"),
+        ]
+
+        with patch(
+            "multiarch_publish._registry_ops.run_command",
+            side_effect=['{"schemaVersion":2}', "   "],
+        ):
+            with self.assertRaisesRegex(
+                CommandError,
+                "failed to publish multi-arch manifest for ghcr.io/acme/test",
+            ):
+                publish_manifest_by_digest("ghcr.io/acme/test", entries)
 
     def test_sign_and_verify_platform_image_checks_attestation(self) -> None:
         with patch(
@@ -72,7 +234,21 @@ class RegistryOpsTests(unittest.TestCase):
                 certificate_identity_regexp="^https://github\\.com/acme/test/",
             )
 
-        self.assertGreaterEqual(run_command_mock.call_count, 4)
+        command_strings = [" ".join(call.args[0]) for call in run_command_mock.call_args_list]
+        self.assertIn("cosign sign --yes ghcr.io/acme/test@sha256:index", command_strings)
+        self.assertIn("cosign sign --yes ghcr.io/acme/test@sha256:platform", command_strings)
+        self.assertIn(
+            "cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com "
+            "--certificate-identity-regexp ^https://github\\.com/acme/test/ "
+            "ghcr.io/acme/test@sha256:index",
+            command_strings,
+        )
+        self.assertIn(
+            "cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com "
+            "--certificate-identity-regexp ^https://github\\.com/acme/test/ "
+            "ghcr.io/acme/test@sha256:platform",
+            command_strings,
+        )
         verify_attestation_mock.assert_called_once()
 
     def test_sign_and_verify_manifest_verifies_target_digest(self) -> None:
