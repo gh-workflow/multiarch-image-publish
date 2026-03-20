@@ -42,7 +42,7 @@ To now build your projects images, change this in the copied workflow:
 ```yaml
 - name: Publish multi-arch image
   id: publish
-  uses: gh-workflow/multiarch-image-publish@0.0.7
+  uses: gh-workflow/multiarch-image-publish@0.0.8
   with:
     image_ref: ghcr.io/acme/my-image
     tags: |

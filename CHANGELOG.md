@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `example-main.yml` as a manual-run copy of the main GHCR example workflow.
+- Added Docker Hub example workflows for released and main-branch action usage:
+  `example-dockerhub.yml` and `example-dockerhub-main.yml`.
+
+### Changed
+
+- Extended the test-suite workflow with drift checks that require each `@main` example workflow to stay aligned
+  with its released counterpart aside from the workflow name and action reference.
+
+### Fixed
+
+- Reworked registry operations to avoid `docker buildx imagetools` for manifest inspection and publication,
+  using `regctl` and `docker manifest` instead.
+- Built final multi-arch manifests from resolved platform manifest digests instead of the original per-platform
+  index digests, avoiding manifest-list inputs during final publication.
+- Resolved pushed manifest digests with `regctl image digest` instead of parsing `docker manifest push` output.
+- Reused each fetched per-platform index manifest for both platform-digest and attestation-digest resolution to
+  avoid duplicate registry reads during verification.
+- Retried transient `cosign verify` failures when registries briefly report `no signatures found` immediately
+  after signing.
+
 ## [0.0.7] - 2026-03-20
 
 ### Changed
