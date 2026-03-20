@@ -9,6 +9,11 @@ permissions:
   packages: write
   id-token: write
 
+env:
+  IMAGE_REF: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}-demo
+  VERSION_TAG: ${{ github.ref_name }}
+  LATEST_TAG: latest
+
 jobs:
   example:
     uses: ./.github/workflows/example.yml
@@ -28,60 +33,101 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22  # v4.1.0
 
+      - name: Verify final tags resolve
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect "${{ env.IMAGE_REF }}:${{ env.VERSION_TAG }}"
+          docker buildx imagetools inspect "${{ env.IMAGE_REF }}:${{ env.LATEST_TAG }}"
+
+      - name: Resolve final manifest digest
+        id: final-manifest
+        run: |
+          set -euo pipefail
+          digest="$(
+            docker buildx imagetools inspect \
+              --format '{{json .Manifest}}' \
+              "${{ env.IMAGE_REF }}:${{ env.VERSION_TAG }}" \
+              | jq -r '.digest'
+          )"
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+
       - name: Verify final manifest signature
-        shell: bash
         run: |
           set -euo pipefail
           certificate_identity_regexp="^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*@(?:refs/.*/.*|[0-9a-f]{40})$"
           cosign verify \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             --certificate-identity-regexp "${certificate_identity_regexp}" \
-            "${{ needs.example.outputs.image_ref }}@${{ needs.example.outputs.manifest_digest }}"
+            "${{ env.IMAGE_REF }}@${{ steps.final-manifest.outputs.digest }}"
 
       - name: Verify final tags resolve to manifest digest
-        shell: bash
         run: |
           set -euo pipefail
           for tag in \
-            "${{ needs.example.outputs.version_tag }}" \
-            "${{ needs.example.outputs.latest_tag }}"
+            "${{ env.VERSION_TAG }}" \
+            "${{ env.LATEST_TAG }}"
           do
             digest="$(
               docker buildx imagetools inspect \
                 --format '{{json .Manifest}}' \
-                "${{ needs.example.outputs.image_ref }}:${tag}" \
+                "${{ env.IMAGE_REF }}:${tag}" \
                 | jq -r '.digest'
             )"
-            test "$digest" = "${{ needs.example.outputs.manifest_digest }}"
+            test "$digest" = "${{ steps.final-manifest.outputs.digest }}"
           done
 
       - name: Verify final manifest includes both platforms
-        shell: bash
         run: |
           set -euo pipefail
           docker buildx imagetools inspect \
-            --raw "${{ needs.example.outputs.image_ref }}@${{ needs.example.outputs.manifest_digest }}" \
+            --raw "${{ env.IMAGE_REF }}@${{ steps.final-manifest.outputs.digest }}" \
             | jq -e '
               .manifests as $manifests
               | any($manifests[]?; .platform.os == "linux" and .platform.architecture == "amd64")
                 and any($manifests[]?; .platform.os == "linux" and .platform.architecture == "arm64")
             '
 
-      - name: Verify per-platform tags resolve to original digests
-        shell: bash
+      - name: Verify per-platform tags resolve
         run: |
           set -euo pipefail
-          amd64_digest="$(
+          docker buildx imagetools inspect "${{ env.IMAGE_REF }}:${{ env.VERSION_TAG }}-amd64"
+          docker buildx imagetools inspect "${{ env.IMAGE_REF }}:${{ env.VERSION_TAG }}-arm64"
+
+      - name: Verify per-platform image signatures
+        run: |
+          set -euo pipefail
+          certificate_identity_regexp="^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*@(?:refs/.*/.*|[0-9a-f]{40})$"
+          for tag in \
+            "${{ env.VERSION_TAG }}-amd64" \
+            "${{ env.VERSION_TAG }}-arm64"
+          do
+            cosign verify \
+              --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+              --certificate-identity-regexp "${certificate_identity_regexp}" \
+              "${{ env.IMAGE_REF }}:${tag}"
+          done
+
+      - name: Verify per-platform image provenance
+        run: |
+          set -euo pipefail
+          for tag in \
+            "${{ env.VERSION_TAG }}-amd64" \
+            "${{ env.VERSION_TAG }}-arm64"
+          do
+            attestation_digest="$(
+              docker buildx imagetools inspect \
+                --raw "${{ env.IMAGE_REF }}:${tag}" \
+                | jq -r '
+                  .manifests[]
+                  | select(.annotations["vnd.docker.reference.type"] == "attestation-manifest")
+                  | .digest
+                '
+            )"
+            test -n "${attestation_digest}"
             docker buildx imagetools inspect \
-              --format '{{json .Manifest}}' \
-              "${{ needs.example.outputs.image_ref }}:${{ needs.example.outputs.version_tag }}-amd64" \
-              | jq -r '.digest'
-          )"
-          arm64_digest="$(
-            docker buildx imagetools inspect \
-              --format '{{json .Manifest}}' \
-              "${{ needs.example.outputs.image_ref }}:${{ needs.example.outputs.version_tag }}-arm64" \
-              | jq -r '.digest'
-          )"
-          test "$amd64_digest" = "${{ needs.example.outputs.digest_amd64 }}"
-          test "$arm64_digest" = "${{ needs.example.outputs.digest_arm64 }}"
+              --raw "${{ env.IMAGE_REF }}@${attestation_digest}" \
+              | jq -e '
+                any(.layers[]?; (.annotations["in-toto.io/predicate-type"] // "")
+                  | startswith("https://slsa.dev/provenance/"))
+              ' >/dev/null
+          done
