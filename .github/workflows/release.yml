@@ -23,23 +23,34 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
-      - name: Verify README and example workflow use current tag
+      - name: Verify README and example workflows use current tag
         run: |
           set -euo pipefail
           if rg -n "gh-workflow/multiarch-image-publish@(?!${GITHUB_REF_NAME}\\b)" \
-            README.md .github/workflows/example.yml -P; then
+              README.md \
+              .github/workflows/example.yml \
+              .github/workflows/example-dockerhub.yml \
+              -P
+          then
             echo "Found action refs not pinned to ${GITHUB_REF_NAME}" >&2
             exit 1
           fi
+
 
   test-e2e:
     needs: [change-validation, verify-release-refs]
     if: startsWith(github.ref, 'refs/tags/')
     uses: ./.github/workflows/test-e2e.yml
 
+  test-e2e-dockerhub:
+    needs: [change-validation, verify-release-refs]
+    if: startsWith(github.ref, 'refs/tags/')
+    uses: ./.github/workflows/test-e2e-dockerhub.yml
+    secrets: inherit
+
   release:
     name: Publish release
-    needs: [change-validation, verify-release-refs, test-e2e]
+    needs: [change-validation, verify-release-refs, test-e2e, test-e2e-dockerhub]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:

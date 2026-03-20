@@ -44,6 +44,27 @@ jobs:
           PY
           diff -u .github/workflows/example.yml /tmp/example-main.normalized.yml
 
+      - name: Check `example-dockerhub-main.yml` only differs by action ref
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          example_main = Path(".github/workflows/example-dockerhub-main.yml").read_text(
+              encoding="utf-8"
+          )
+          normalized = example_main.replace(
+              "name: Example Publish Docker Hub Main",
+              "name: Example Publish Docker Hub",
+          ).replace(
+              "gh-workflow/multiarch-image-publish@main",
+              "gh-workflow/multiarch-image-publish@0.0.7",
+          )
+          Path("/tmp/example-dockerhub-main.normalized.yml").write_text(
+              normalized, encoding="utf-8"
+          )
+          PY
+          diff -u .github/workflows/example-dockerhub.yml /tmp/example-dockerhub-main.normalized.yml
+
       - name: Run tests
         run: |
           pytest --cov=src --cov-report=term-missing

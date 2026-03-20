@@ -16,12 +16,18 @@ Build and test each architecture in your workflow, then use this action to publi
 
 To quickly get up and running:
 
-1. Copy the [Example Publish](.github/workflows/example.yml) workflow to your default branch.
-2. On GitHub, in your repo's Actions tab, run the `Example Publish` workflow.
+1. Copy the workflow that matches your registry to your default branch:
+   [Example Publish](.github/workflows/example.yml) for GHCR or
+   [Example Publish Docker Hub](.github/workflows/example-dockerhub.yml) for Docker Hub.
+2. On GitHub, in your repo's Actions tab, run the copied workflow.
 
 This will publish a demo image package at `ghcr.io/<owner>/<repo-name>-demo`.
 
-> Note: the published package also includes signatures and provenance for the per-platform images.
+> Notes:
+>
+> - The published package also includes signatures and provenance for the per-platform images.
+> - GHCR is recommended for larger or frequently re-run publish jobs because Docker Hub free accounts have pull-rate
+>   limits.
 
 ### Customize
 
@@ -77,3 +83,4 @@ those images, then publishes the final multi-arch manifest and tags.
 - registry login already performed in the publishing job
 - `id-token: write` for keyless `cosign` signing
 - `packages: write` for GHCR registries
+- `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` secrets for Docker Hub examples
