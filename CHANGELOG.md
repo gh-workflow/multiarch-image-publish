@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.9] - 2026-03-21
+
+### Changed
+
+- Cosmetic changes in `README.md`.
+
+## [0.0.8] - 2026-03-20
+
 ### Added
 
 - Added `example-main.yml` as a manual-run copy of the main GHCR example workflow.
