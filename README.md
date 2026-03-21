@@ -17,8 +17,8 @@ Build and test each architecture in your workflow, then use this action to publi
 To quickly get up and running:
 
 1. Copy the workflow that matches your registry to your default branch:
-   [Example Publish](.github/workflows/example.yml) for GHCR or
-   [Example Publish Docker Hub](.github/workflows/example-dockerhub.yml) for Docker Hub.
+   - [Example Publish](.github/workflows/example.yml) for GHCR or
+   - [Example Publish Docker Hub](.github/workflows/example-dockerhub.yml) for Docker Hub.
 2. On GitHub, in your repo's Actions tab, run the copied workflow.
 
 This will publish a demo image package at `ghcr.io/<owner>/<repo-name>-demo`.
