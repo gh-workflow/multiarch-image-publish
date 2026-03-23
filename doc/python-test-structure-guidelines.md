@@ -55,7 +55,7 @@ tests/
 - Includes module-level functions and class methods (instance, class, and static methods).
 - Exclude dunder methods like `__init__` and `__call__`.
 - Exclude methods defined on Protocol classes (for example, `typing.Protocol`).
-- Ignore generated files like `src/aicage/_version.py`.
+- Ignore generated files like `src/*/_version.py`.
 - Each such method must have at least one matching test method in the correct test module.
   - Test method names must match the source method name.
   - Leading `_` in source names may be dropped in the test name
