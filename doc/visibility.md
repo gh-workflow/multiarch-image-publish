@@ -23,7 +23,7 @@ Instead, public symbols must be named without a leading underscore and be used o
 
 ## How enforcement works
 
-- ``tests/multiarch_publish/test_visibility.py`` rejects any use of ``__all__``.
+- ``tests/repo_rules/test_visibility.py`` rejects any use of ``__all__``.
 - The same test suite flags private modules or symbols referenced outside their scope.
 - The public-symbol usage test reports public symbols that are never used outside their defining module.
 

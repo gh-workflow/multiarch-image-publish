@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Internal
+
+- Moved repository rule tests into `tests/repo_rules` so repo-level structure and visibility checks are kept
+  separate from package-specific tests.
+- Emptied package `__init__.py` files in `tests` to keep them marker-only.
+
 ## [0.0.9] - 2026-03-21
 
 ### Changed
