@@ -3,11 +3,11 @@ line-length = 120
 
 [tool.ruff.lint]
 select = [
-  "E", "F",
-  "I",
-  "UP",
-  "B",
-  "PL",
-  "SLF",
+  "E", "F",        # correctness
+  "I",             # imports
+  "UP",            # pyupgrade
+  "B",             # bugbear
+  "PL",            # pylint rules (incl. protected access)
+  "SLF",           # flake8-self (private member access)
 ]
 per-file-ignores = { "tests/**" = ["SLF001"] }

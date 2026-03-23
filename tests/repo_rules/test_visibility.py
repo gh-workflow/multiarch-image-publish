@@ -11,6 +11,7 @@ class VisibilityRulesTests(TestCase):
         violations: list[Path] = []
         for path in src_dir.rglob("*.py"):
             if path.name == "_version.py":
+                # Generated file from setuptools-scm; allow __all__ in version metadata.
                 continue
             if "__all__" in path.read_text(encoding="utf-8"):
                 violations.append(path.relative_to(repo_root))
@@ -26,6 +27,8 @@ class VisibilityRulesTests(TestCase):
             current_package = _current_package(module_name, path)
             tree = _parse_tree(path)
             for imported in _iter_imported_modules(tree, current_package):
+                if _is_root_version_import(module_name, imported):
+                    continue
                 if _has_private_segment(imported):
                     violations.append(f"{path.relative_to(repo_root)}:{imported}")
 
@@ -89,7 +92,11 @@ class VisibilityRulesTests(TestCase):
                     continue
                 violations.append(f"{info.path.relative_to(repo_root)}:{symbol}")
 
-        self.assertEqual([], violations, f"Found public symbols without external usage: {violations}")
+        self.assertEqual(
+            [],
+            violations,
+            f"Found public symbols without external usage: {violations}",
+        )
 
     def test_public_modules_are_used_outside_package(self) -> None:
         repo_root = _repo_root()
@@ -109,7 +116,11 @@ class VisibilityRulesTests(TestCase):
             if not _has_outside_package_usage(importers, modules, module_package):
                 violations.append(f"{info.path.relative_to(repo_root)}:{module_name}")
 
-        self.assertEqual([], violations, f"Found public modules without external usage: {violations}")
+        self.assertEqual(
+            [],
+            violations,
+            f"Found public modules without external usage: {violations}",
+        )
 
 
 def _repo_root() -> Path:
@@ -133,6 +144,10 @@ def _current_package(module_name: str, path: Path) -> list[str]:
     if path.name == "__init__.py":
         return parts
     return parts[:-1]
+
+
+def _is_root_version_import(module_name: str, imported: str) -> bool:
+    return "." not in module_name and imported == f"{module_name}._version"
 
 
 def _parse_tree(path: Path) -> ast.AST:
