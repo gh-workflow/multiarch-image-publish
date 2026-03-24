@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.10] - 2026-03-24
+
+### Fixed
+
+- Published multi-arch manifests by digest instead of through a mutable repository tag, preventing concurrent
+  action runs from interfering with each other during publication.
+
 ### Internal
 
 - Moved repository rule tests into `tests/repo_rules` so repo-level structure and visibility checks are kept
