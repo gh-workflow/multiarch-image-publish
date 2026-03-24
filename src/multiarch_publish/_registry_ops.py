@@ -188,17 +188,28 @@ def publish_platform_tags(
 
 def publish_manifest_by_digest(image_ref: str, entries: list[PlatformDigest]) -> str:
     """Publish a multi-platform manifest by digest and return its digest."""
-    run_command(
+    manifest_json = run_command(
         [
             "docker",
-            "manifest",
+            "buildx",
+            "imagetools",
             "create",
-            image_ref,
+            "--dry-run",
             *[f"{image_ref}@{entry.digest}" for entry in entries],
         ]
     )
-    run_command(["docker", "manifest", "push", image_ref])
-    digest = run_command(["regctl", "image", "digest", image_ref]).strip()
+    digest = run_command(
+        [
+            "regctl",
+            "manifest",
+            "put",
+            "--by-digest",
+            image_ref,
+            "--format",
+            "{{ ( .Manifest.GetDescriptor ).Digest }}",
+        ],
+        input_text=manifest_json,
+    ).strip()
     if digest:
         return digest
     raise CommandError(f"failed to resolve pushed manifest digest for {image_ref}")

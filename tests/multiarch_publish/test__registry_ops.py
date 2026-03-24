@@ -245,21 +245,32 @@ class RegistryOpsTests(unittest.TestCase):
             PlatformDigest(Platform(os="linux", architecture="amd64"), "sha256:amd64"),
             PlatformDigest(Platform(os="linux", architecture="arm64"), "sha256:arm64"),
         ]
+        manifest_json = '{"schemaVersion":2}'
 
         with patch(
             "multiarch_publish._registry_ops.run_command",
             side_effect=[
-                "",
-                "",
+                manifest_json,
                 "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             ],
-        ):
+        ) as run_command_mock:
             digest = publish_manifest_by_digest("ghcr.io/acme/test", entries)
 
         self.assertEqual(
             digest,
             "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         )
+        command_strings = [" ".join(call.args[0]) for call in run_command_mock.call_args_list]
+        self.assertIn(
+            "docker buildx imagetools create --dry-run "
+            "ghcr.io/acme/test@sha256:amd64 ghcr.io/acme/test@sha256:arm64",
+            command_strings,
+        )
+        self.assertIn(
+            "regctl manifest put --by-digest ghcr.io/acme/test --format {{ ( .Manifest.GetDescriptor ).Digest }}",
+            command_strings,
+        )
+        self.assertEqual(run_command_mock.call_args_list[1].kwargs["input_text"], manifest_json)
 
     def test_publish_manifest_by_digest_raises_when_digest_lookup_is_empty(self) -> None:
         entries = [
@@ -268,7 +279,7 @@ class RegistryOpsTests(unittest.TestCase):
 
         with patch(
             "multiarch_publish._registry_ops.run_command",
-            side_effect=["", "", "  "],
+            side_effect=['{"schemaVersion":2}', "  "],
         ):
             with self.assertRaisesRegex(
                 CommandError,
