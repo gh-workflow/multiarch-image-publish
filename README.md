@@ -4,7 +4,7 @@
 [![Immutable Releases](https://img.shields.io/badge/releases-immutable-blue?labelColor=333)](https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/immutable-releases)
 [![GitHub Marketplace](https://img.shields.io/badge/marketplace-publish--multiarch--image-blue?logo=github&labelColor=333&style=flat-square)](https://github.com/marketplace/actions/publish-multi-arch-image)
 [![Tests](https://img.shields.io/github/actions/workflow/status/gh-workflow/multiarch-image-publish/change-validation.yml?branch=main&label=test&style=flat-square)](https://github.com/gh-workflow/multiarch-image-publish/actions/workflows/change-validation.yml)
-[![Multi-Arch](https://img.shields.io/badge/image-multi--arch-2496ED?logo=docker&logoColor=white&style=flat-square)](#usage)
+[![Multi-Arch](https://img.shields.io/badge/image-multiarch-2496ED?logo=docker&logoColor=white&style=flat-square)](#usage)
 [![Cosign](https://img.shields.io/badge/signing-cosign-3EAAAF?logo=sigstore&logoColor=white&style=flat-square)](#usage)
 
 Publish a signed multi-arch container image from pre-built per-architecture images.
