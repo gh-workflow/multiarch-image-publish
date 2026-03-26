@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-03-26
+
+### Added
+
+- Added a coverage badge to the README that points at `coverage.svg` from the latest GitHub release.
+
+### Internal
+
+- Generate the coverage badge during the release workflow and upload it as a release asset.
+- Added `genbadge` as a development dependency for release-time badge generation.
+
 ## [0.1.1] - 2026-03-26
 
 ### Fixed

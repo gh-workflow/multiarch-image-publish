@@ -47,7 +47,7 @@ To now build your projects images, change this in the copied workflow:
 ```yaml
 - name: Publish MultiArch Image
   id: publish
-  uses: gh-workflow/multiarch-image-publish@0.1.1
+  uses: gh-workflow/multiarch-image-publish@0.1.2
   with:
     image_ref: ghcr.io/acme/my-image
     tags: |
