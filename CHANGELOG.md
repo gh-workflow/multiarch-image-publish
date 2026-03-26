@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-03-26
+
+### Changed
+
+- Renamed the action metadata title to `Publish MultiArch Image` and added Marketplace branding.
+- Refined the README badge set for release status, Marketplace availability, test status, multi-arch
+  publishing, and cosign signing.
+
+### Internal
+
+- Added concurrency cancellation to `change-validation.yml` so superseded validation runs are stopped.
+
 ## [0.0.10] - 2026-03-24
 
 ### Fixed
