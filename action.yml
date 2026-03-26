@@ -1,7 +1,11 @@
-name: Publish Multi-Arch Image
+name: Publish MultiArch Image
 
 description: >
   Publish and sign a multi-arch container image from pre-built arch images.
+
+branding:
+  icon: upload-cloud
+  color: blue
 
 inputs:
   image_ref:
