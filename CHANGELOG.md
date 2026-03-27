@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-03-27
+
+### Changed
+
+- Bumped `sigstore/cosign-installer` from `v4.1.0` to `v4.1.1`.
+
+### Fixed
+
+- Switched release reference verification from `rg -P` to `grep -P`.
+
 ## [0.1.4] - 2026-03-27
 
 ### Changed
