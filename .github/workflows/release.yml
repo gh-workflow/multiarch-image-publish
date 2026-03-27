@@ -26,11 +26,10 @@ jobs:
       - name: Verify README and example workflows use current tag
         run: |
           set -euo pipefail
-          if rg -n "gh-workflow/multiarch-image-publish@(?!${GITHUB_REF_NAME}\\b)" \
+          if grep -nP "gh-workflow/multiarch-image-publish@(?!${GITHUB_REF_NAME}\\b)" \
               README.md \
               .github/workflows/example.yml \
-              .github/workflows/example-dockerhub.yml \
-              -P
+              .github/workflows/example-dockerhub.yml
           then
             echo "Found action refs not pinned to ${GITHUB_REF_NAME}" >&2
             exit 1
