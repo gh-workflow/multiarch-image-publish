@@ -56,6 +56,8 @@ class VisibilityRulesTests(TestCase):
             current_package = _current_package(module_name, path)
             tree = _parse_tree(path)
             for imported in _iter_imported_modules(tree, current_package):
+                if imported == "__future__":
+                    continue
                 private_parent = _private_parent_package(imported)
                 if private_parent is None:
                     continue
