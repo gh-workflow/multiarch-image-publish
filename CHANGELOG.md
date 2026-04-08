@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-04-08
+
+### Added
+
+- Added optional `annotations` input so callers can attach OCI annotations to the published
+  multi-arch manifest.
+
 ## [0.1.5] - 2026-03-27
 
 ### Changed
