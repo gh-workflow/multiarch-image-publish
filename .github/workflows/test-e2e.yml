@@ -1,4 +1,4 @@
-name: Test End-to-End
+name: Test End-to-End GHCR
 
 "on":
   workflow_call:
@@ -13,6 +13,7 @@ env:
   IMAGE_REF: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}-demo
   VERSION_TAG: ${{ github.ref_name }}
   LATEST_TAG: latest
+  EXPECTED_SOURCE: ${{ github.server_url }}/${{ github.repository }}
 
 jobs:
   example:
@@ -85,6 +86,16 @@ jobs:
               .manifests as $manifests
               | any($manifests[]?; .platform.os == "linux" and .platform.architecture == "amd64")
                 and any($manifests[]?; .platform.os == "linux" and .platform.architecture == "arm64")
+            '
+
+      - name: Verify final manifest annotations
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect \
+            --raw "${{ env.IMAGE_REF }}@${{ steps.final-manifest.outputs.digest }}" \
+            | jq -e '
+              .annotations["org.opencontainers.image.source"] == "${{ env.EXPECTED_SOURCE }}"
+              and .annotations["org.opencontainers.image.version"] == "${{ env.VERSION_TAG }}"
             '
 
       - name: Verify per-platform tags resolve

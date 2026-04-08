@@ -55,6 +55,9 @@ To now build your projects images, change this in the copied workflow:
     platform_digests: |
       linux/amd64=sha256:...
       linux/arm64=sha256:...
+    annotations: |
+      org.opencontainers.image.source=https://github.com/acme/my-image
+      org.opencontainers.image.version=${{ github.ref_name }}
 ```
 
 `platform_digests` are the pushed per-architecture image digests produced earlier in your workflow.
@@ -69,17 +72,18 @@ those images, then publishes the final multi-arch manifest and tags.
 
 ## Inputs
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `image_ref` | yes | Image reference, for example `ghcr.io/acme/my-image`. |
-| `tags` | yes | Newline-separated tags to publish. |
-| `platform_digests` | yes | Newline-separated `platform=digest` entries. |
-| `certificate_oidc_issuer` | no | Expected issuer for cosign verification. |
+| Name                      | Required | Description                                           |
+|---------------------------|----------|-------------------------------------------------------|
+| `image_ref`               | yes      | Image reference, for example `ghcr.io/acme/my-image`. |
+| `tags`                    | yes      | Newline-separated tags to publish.                    |
+| `platform_digests`        | yes      | Newline-separated `platform=digest` entries.          |
+| `annotations`             | no       | Newline-separated `key=value` manifest annotations.   |
+| `certificate_oidc_issuer` | no       | Expected issuer for cosign verification.              |
 
 ## Outputs
 
-| Name | Description |
-| --- | --- |
+| Name              | Description                           |
+|-------------------|---------------------------------------|
 | `manifest_digest` | Published multi-arch manifest digest. |
 
 ## Requirements

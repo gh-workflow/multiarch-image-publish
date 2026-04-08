@@ -92,7 +92,7 @@ class ActionTests(unittest.TestCase):
             side_effect=lambda **_: call_order.append("platform"),
         ), patch(
             "multiarch_publish._action.publish_manifest_by_digest",
-            side_effect=lambda *_: call_order.append("manifest") or "sha256:manifest",
+            side_effect=lambda *_, **__: call_order.append("manifest") or "sha256:manifest",
         ), patch(
             "multiarch_publish._action.sign_and_verify_manifest",
             side_effect=lambda **_: call_order.append("verify-manifest"),
@@ -174,6 +174,60 @@ class ActionTests(unittest.TestCase):
                 PlatformDigest(Platform(os="linux", architecture="amd64"), "sha256:manifest-amd64"),
                 PlatformDigest(Platform(os="linux", architecture="arm64"), "sha256:manifest-arm64"),
             ],
+        )
+        self.assertEqual(publish_manifest_mock.call_args.kwargs["annotations"], {})
+
+    def test_run_action_passes_annotations_to_publish_manifest(self) -> None:
+        output_file = Path(tempfile.gettempdir()) / "github-output-annotations.txt"
+        env = {
+            "INPUT_IMAGE_REF": "ghcr.io/acme/test",
+            "INPUT_TAGS": "latest",
+            "INPUT_PLATFORM_DIGESTS": "linux/amd64=sha256:index-amd64",
+            "INPUT_ANNOTATIONS": (
+                "org.opencontainers.image.source=https://github.com/acme/test\n"
+                "org.opencontainers.image.version=v1.2.3"
+            ),
+            "INPUT_CERTIFICATE_OIDC_ISSUER": "https://token.actions.githubusercontent.com",
+            "GITHUB_REPOSITORY": "acme/test",
+            "GITHUB_OUTPUT": str(output_file),
+        }
+        entries = [
+            PlatformDigest(Platform(os="linux", architecture="amd64"), "sha256:index-amd64"),
+        ]
+
+        with patch.dict("os.environ", env, clear=False), patch(
+            "multiarch_publish._action.parse_platform_digests",
+            return_value=entries,
+        ), patch(
+            "multiarch_publish._action.resolve_platform_verification_digests",
+            return_value=_PlatformVerificationDigests(
+                platform_digest="sha256:manifest-amd64",
+                attestation_digest="sha256:attestation-amd64",
+            ),
+        ), patch(
+            "multiarch_publish._action.sign_and_verify_platform_image",
+            return_value=None,
+        ), patch(
+            "multiarch_publish._action.publish_manifest_by_digest",
+            return_value="sha256:manifest",
+        ) as publish_manifest_mock, patch(
+            "multiarch_publish._action.sign_and_verify_manifest",
+            return_value=None,
+        ), patch(
+            "multiarch_publish._action.publish_platform_tags",
+            return_value=None,
+        ), patch(
+            "multiarch_publish._action.publish_final_tags",
+            return_value=None,
+        ):
+            _run_action()
+
+        self.assertEqual(
+            publish_manifest_mock.call_args.kwargs["annotations"],
+            {
+                "org.opencontainers.image.source": "https://github.com/acme/test",
+                "org.opencontainers.image.version": "v1.2.3",
+            },
         )
 
 

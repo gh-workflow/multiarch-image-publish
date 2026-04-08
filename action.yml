@@ -17,6 +17,10 @@ inputs:
   platform_digests:
     description: Newline-separated list of platform=digest pairs.
     required: true
+  annotations:
+    description: Optional newline-separated list of manifest annotation key=value pairs.
+    required: false
+    default: ""
   certificate_oidc_issuer:
     description: Expected OIDC issuer for cosign verification.
     required: false
@@ -44,6 +48,7 @@ runs:
         INPUT_IMAGE_REF: ${{ inputs.image_ref }}
         INPUT_TAGS: ${{ inputs.tags }}
         INPUT_PLATFORM_DIGESTS: ${{ inputs.platform_digests }}
+        INPUT_ANNOTATIONS: ${{ inputs.annotations }}
         INPUT_CERTIFICATE_OIDC_ISSUER: ${{ inputs.certificate_oidc_issuer }}
       run: |
         set -euo pipefail

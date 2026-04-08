@@ -5,6 +5,8 @@ from multiarch_publish._errors import CommandError
 from multiarch_publish._models import Platform, PlatformDigest
 from multiarch_publish._registry_ops import (
     _inspect_raw_manifest,
+    _merge_annotations,
+    _parse_manifest_json,
     _PlatformVerificationDigests,
     _resolve_attestation_digest,
     _resolve_platform_manifest_digest,
@@ -240,6 +242,39 @@ class RegistryOpsTests(unittest.TestCase):
             ):
                 _verify_attestation_contains_provenance("ghcr.io/acme/test", "sha256:attestation")
 
+    def test_parse_manifest_json_returns_manifest(self) -> None:
+        manifest = _parse_manifest_json('{"schemaVersion":2}', "ghcr.io/acme/test")
+
+        self.assertEqual(manifest, {"schemaVersion": 2})
+
+    def test_parse_manifest_json_raises_on_invalid_json(self) -> None:
+        with self.assertRaisesRegex(
+            CommandError,
+            "docker buildx returned invalid manifest JSON for ghcr.io/acme/test",
+        ):
+            _parse_manifest_json("not-json", "ghcr.io/acme/test")
+
+    def test_merge_annotations_merges_existing_annotations(self) -> None:
+        merged_annotations = _merge_annotations(
+            {
+                "annotations": {
+                    "org.opencontainers.image.source": "https://github.com/acme/original",
+                }
+            },
+            {
+                "org.opencontainers.image.source": "https://github.com/acme/test",
+                "org.opencontainers.image.version": "v1.2.3",
+            },
+        )
+
+        self.assertEqual(
+            merged_annotations,
+            {
+                "org.opencontainers.image.source": "https://github.com/acme/test",
+                "org.opencontainers.image.version": "v1.2.3",
+            },
+        )
+
     def test_publish_manifest_by_digest_returns_digest(self) -> None:
         entries = [
             PlatformDigest(Platform(os="linux", architecture="amd64"), "sha256:amd64"),
@@ -254,7 +289,11 @@ class RegistryOpsTests(unittest.TestCase):
                 "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             ],
         ) as run_command_mock:
-            digest = publish_manifest_by_digest("ghcr.io/acme/test", entries)
+            digest = publish_manifest_by_digest(
+                "ghcr.io/acme/test",
+                entries,
+                annotations={"org.opencontainers.image.version": "v1.2.3"},
+            )
 
         self.assertEqual(
             digest,
@@ -270,7 +309,10 @@ class RegistryOpsTests(unittest.TestCase):
             "regctl manifest put --by-digest ghcr.io/acme/test --format {{ ( .Manifest.GetDescriptor ).Digest }}",
             command_strings,
         )
-        self.assertEqual(run_command_mock.call_args_list[1].kwargs["input_text"], manifest_json)
+        self.assertEqual(
+            run_command_mock.call_args_list[1].kwargs["input_text"],
+            '{"schemaVersion":2,"annotations":{"org.opencontainers.image.version":"v1.2.3"}}',
+        )
 
     def test_publish_manifest_by_digest_raises_when_digest_lookup_is_empty(self) -> None:
         entries = [
@@ -285,7 +327,30 @@ class RegistryOpsTests(unittest.TestCase):
                 CommandError,
                 "failed to resolve pushed manifest digest for ghcr.io/acme/test",
             ):
-                publish_manifest_by_digest("ghcr.io/acme/test", entries)
+                publish_manifest_by_digest(
+                    "ghcr.io/acme/test",
+                    entries,
+                    annotations={},
+                )
+
+    def test_publish_manifest_by_digest_raises_on_invalid_manifest_json(self) -> None:
+        entries = [
+            PlatformDigest(Platform(os="linux", architecture="amd64"), "sha256:amd64"),
+        ]
+
+        with patch(
+            "multiarch_publish._registry_ops.run_command",
+            return_value="not-json",
+        ):
+            with self.assertRaisesRegex(
+                CommandError,
+                "docker buildx returned invalid manifest JSON for ghcr.io/acme/test",
+            ):
+                publish_manifest_by_digest(
+                    "ghcr.io/acme/test",
+                    entries,
+                    annotations={},
+                )
 
     def test_run_verify_command_retries_no_signatures_found(self) -> None:
         with patch(

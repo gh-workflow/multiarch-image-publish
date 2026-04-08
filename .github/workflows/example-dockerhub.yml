@@ -110,6 +110,9 @@ jobs:
           platform_digests: |
             linux/amd64=${{ needs.build.outputs.digest_amd64 }}
             linux/arm64=${{ needs.build.outputs.digest_arm64 }}
+          annotations: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ github.ref_name }}
 
       - name: Print result
         run: |

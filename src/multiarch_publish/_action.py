@@ -8,6 +8,7 @@ from multiarch_publish._errors import CommandError, InputError
 from multiarch_publish._github_output import write_output
 from multiarch_publish._input_parser import (
     caller_certificate_identity_regexp,
+    parse_annotations,
     parse_platform_digests,
     parse_tags,
 )
@@ -41,6 +42,7 @@ def _run_action() -> str:
     image_ref = _require_env("INPUT_IMAGE_REF")
     tags = parse_tags(_require_env("INPUT_TAGS"))
     entries = parse_platform_digests(_require_env("INPUT_PLATFORM_DIGESTS"))
+    annotations = parse_annotations(os.environ.get("INPUT_ANNOTATIONS", ""))
     certificate_oidc_issuer = _require_env("INPUT_CERTIFICATE_OIDC_ISSUER")
     repository = _require_env("GITHUB_REPOSITORY")
 
@@ -60,7 +62,11 @@ def _run_action() -> str:
             certificate_identity_regexp=certificate_identity_regexp,
         )
 
-    manifest_digest = publish_manifest_by_digest(image_ref, manifest_entries)
+    manifest_digest = publish_manifest_by_digest(
+        image_ref,
+        manifest_entries,
+        annotations=annotations,
+    )
     sign_and_verify_manifest(
         image_ref=image_ref,
         manifest_digest=manifest_digest,

@@ -55,6 +55,28 @@ def _copy_image(source_ref: str, target_ref: str) -> None:
     run_command(["regctl", "image", "copy", source_ref, target_ref])
 
 
+def _parse_manifest_json(manifest_json: str, image_ref: str) -> dict:
+    """Parse manifest JSON returned by docker buildx."""
+    try:
+        return json.loads(manifest_json)
+    except json.JSONDecodeError as exc:
+        raise CommandError(
+            f"docker buildx returned invalid manifest JSON for {image_ref}"
+        ) from exc
+
+
+def _merge_annotations(manifest: dict, annotations: dict[str, str]) -> dict[str, str]:
+    """Merge existing manifest annotations with new annotations."""
+    merged_annotations: dict[str, str] = {}
+    existing_annotations = manifest.get("annotations", {})
+    if isinstance(existing_annotations, dict):
+        for key, value in existing_annotations.items():
+            if isinstance(key, str) and isinstance(value, str):
+                merged_annotations[key] = value
+    merged_annotations.update(annotations)
+    return merged_annotations
+
+
 def _resolve_platform_manifest_digest(image_ref: str, entry: PlatformDigest) -> str:
     """Resolve the platform-specific manifest digest inside a pushed image index."""
     manifest = _inspect_raw_manifest(f"{image_ref}@{entry.digest}")
@@ -186,7 +208,12 @@ def publish_platform_tags(
         _copy_image(source_ref, f"{image_ref}:{tag}-{tag_suffix}")
 
 
-def publish_manifest_by_digest(image_ref: str, entries: list[PlatformDigest]) -> str:
+def publish_manifest_by_digest(
+    image_ref: str,
+    entries: list[PlatformDigest],
+    *,
+    annotations: dict[str, str],
+) -> str:
     """Publish a multi-platform manifest by digest and return its digest."""
     manifest_json = run_command(
         [
@@ -198,6 +225,9 @@ def publish_manifest_by_digest(image_ref: str, entries: list[PlatformDigest]) ->
             *[f"{image_ref}@{entry.digest}" for entry in entries],
         ]
     )
+    manifest = _parse_manifest_json(manifest_json, image_ref)
+    if annotations:
+        manifest["annotations"] = _merge_annotations(manifest, annotations)
     digest = run_command(
         [
             "regctl",
@@ -208,7 +238,7 @@ def publish_manifest_by_digest(image_ref: str, entries: list[PlatformDigest]) ->
             "--format",
             "{{ ( .Manifest.GetDescriptor ).Digest }}",
         ],
-        input_text=manifest_json,
+        input_text=json.dumps(manifest, separators=(",", ":")),
     ).strip()
     if digest:
         return digest

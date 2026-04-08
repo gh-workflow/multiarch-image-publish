@@ -3,6 +3,7 @@ import unittest
 from multiarch_publish._errors import InputError
 from multiarch_publish._input_parser import (
     caller_certificate_identity_regexp,
+    parse_annotations,
     parse_platform_digests,
     parse_tags,
 )
@@ -26,6 +27,21 @@ class InputParserTests(unittest.TestCase):
             Platform(os="linux", architecture="arm", variant="v7"),
         )
         self.assertEqual(entries[1].digest, "sha256:bbb")
+
+    def test_parse_annotations_returns_key_value_pairs(self) -> None:
+        annotations = parse_annotations("org.opencontainers.image.source=https://github.com/acme/test\nx.test.key=value")
+
+        self.assertEqual(
+            annotations,
+            {
+                "org.opencontainers.image.source": "https://github.com/acme/test",
+                "x.test.key": "value",
+            },
+        )
+
+    def test_parse_annotations_rejects_duplicate_keys(self) -> None:
+        with self.assertRaisesRegex(InputError, "duplicate key 'x.test.key'"):
+            parse_annotations("x.test.key=value\nx.test.key=other")
 
     def test_caller_certificate_identity_regexp_escapes_repo(self) -> None:
         pattern = caller_certificate_identity_regexp("org/repo.name")

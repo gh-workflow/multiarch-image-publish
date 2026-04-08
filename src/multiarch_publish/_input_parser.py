@@ -49,6 +49,34 @@ def parse_platform_digests(raw_value: str) -> list[PlatformDigest]:
     return parsed
 
 
+def parse_annotations(raw_value: str) -> dict[str, str]:
+    """Parse optional newline-separated key=value annotation entries."""
+    if raw_value == "":
+        return {}
+
+    entries = _parse_required_multiline(raw_value, "annotations")
+    annotations: dict[str, str] = {}
+
+    for entry in entries:
+        if "=" not in entry:
+            raise InputError(
+                f"invalid annotations entry '{entry}': expected 'key=value'"
+            )
+
+        key, value = entry.split("=", 1)
+        if key == "":
+            raise InputError(
+                f"invalid annotations entry '{entry}': key must be non-empty"
+            )
+        if key in annotations:
+            raise InputError(
+                f"invalid annotations entry '{entry}': duplicate key '{key}'"
+            )
+        annotations[key] = value
+
+    return annotations
+
+
 def caller_certificate_identity_regexp(repository: str) -> str:
     """Build the default cosign identity regexp for caller workflows."""
     escaped_repo = re.escape(repository)
