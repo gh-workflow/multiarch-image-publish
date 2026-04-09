@@ -12,7 +12,6 @@ from multiarch_publish._input_parser import (
     parse_platform_digests,
     parse_tags,
 )
-from multiarch_publish._models import PlatformDigest
 from multiarch_publish._registry_ops import (
     publish_final_tags,
     publish_manifest_by_digest,
@@ -47,13 +46,9 @@ def _run_action() -> str:
     repository = _require_env("GITHUB_REPOSITORY")
 
     certificate_identity_regexp = caller_certificate_identity_regexp(repository)
-    manifest_entries: list[PlatformDigest] = []
 
     for entry in entries:
         verification_digests = resolve_platform_verification_digests(image_ref, entry)
-        manifest_entries.append(
-            PlatformDigest(entry.platform, verification_digests.platform_digest)
-        )
         sign_and_verify_platform_image(
             image_ref=image_ref,
             index_digest=entry.digest,
@@ -64,7 +59,7 @@ def _run_action() -> str:
 
     manifest_digest = publish_manifest_by_digest(
         image_ref,
-        manifest_entries,
+        entries,
         annotations=annotations,
     )
     sign_and_verify_manifest(

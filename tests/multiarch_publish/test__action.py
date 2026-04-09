@@ -118,7 +118,7 @@ class ActionTests(unittest.TestCase):
             ],
         )
 
-    def test_run_action_builds_final_manifest_from_resolved_platform_digests(self) -> None:
+    def test_run_action_builds_final_manifest_from_original_index_digests(self) -> None:
         output_file = Path(tempfile.gettempdir()) / "github-output-manifest-inputs.txt"
         env = {
             "INPUT_IMAGE_REF": "ghcr.io/acme/test",
@@ -171,8 +171,8 @@ class ActionTests(unittest.TestCase):
         self.assertEqual(
             manifest_entries,
             [
-                PlatformDigest(Platform(os="linux", architecture="amd64"), "sha256:manifest-amd64"),
-                PlatformDigest(Platform(os="linux", architecture="arm64"), "sha256:manifest-arm64"),
+                PlatformDigest(Platform(os="linux", architecture="amd64"), "sha256:index-amd64"),
+                PlatformDigest(Platform(os="linux", architecture="arm64"), "sha256:index-arm64"),
             ],
         )
         self.assertEqual(publish_manifest_mock.call_args.kwargs["annotations"], {})
