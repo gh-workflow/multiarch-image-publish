@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-04-09
+
+### Fixed
+
+- Build the final multi-arch manifest from the original per-arch index digests so SBOM and
+  provenance attestations are kept.
+
 ## [0.1.6] - 2026-04-08
 
 ### Added
