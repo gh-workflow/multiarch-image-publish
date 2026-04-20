@@ -95,7 +95,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Publish multi-arch image
-        uses: gh-workflow/multiarch-image-publish@0.1.8
+        uses: gh-workflow/multiarch-image-publish@0.1.9
         with:
           image_ref: ${{ env.IMAGE_REF }}
           # Image tag list:
