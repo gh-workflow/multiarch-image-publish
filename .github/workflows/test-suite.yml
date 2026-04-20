@@ -48,7 +48,7 @@ jobs:
               "name: Example Publish",
           ).replace(
               "gh-workflow/multiarch-image-publish@main",
-              "gh-workflow/multiarch-image-publish@0.1.9",
+              "gh-workflow/multiarch-image-publish@0.1.10",
           )
           Path("/tmp/example-main.normalized.yml").write_text(normalized, encoding="utf-8")
           PY
@@ -67,7 +67,7 @@ jobs:
               "name: Example Publish Docker Hub",
           ).replace(
               "gh-workflow/multiarch-image-publish@main",
-              "gh-workflow/multiarch-image-publish@0.1.9",
+              "gh-workflow/multiarch-image-publish@0.1.10",
           )
           Path("/tmp/example-dockerhub-main.normalized.yml").write_text(
               normalized, encoding="utf-8"
