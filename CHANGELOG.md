@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-04-20
+
+### Changed
+
+- Hardened CI by adding a test-suite check that rejects mutable GitHub Action references in workflows.
+
+### Internal
+
+- Bumped `docker/build-push-action` from `v7.0.0` to `v7.1.0`.
+- Bumped `softprops/action-gh-release` from `v2.6.1` to `v3.0.0`.
+
 ## [0.1.7] - 2026-04-09
 
 ### Fixed
