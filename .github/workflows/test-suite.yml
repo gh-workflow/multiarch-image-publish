@@ -14,7 +14,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Ensure workflow actions use immutable refs
-        uses: Wuodan/ensure-immutable-actions@fd2a29bd03363465f30415f8b9da51bcb7145c99  # v2.5.2-Wuodan.main
+        uses: Wuodan/ensure-immutable-actions@ae103574d29215453dd06de89d61422edacf20a5  # v2.5.5-Wuodan.main
         with:
           exclude-workflows: >-
             example.yml,
