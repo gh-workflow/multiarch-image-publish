@@ -45,7 +45,7 @@ jobs:
         run: |
           sed \
             -e 's#name: Example Publish Main#name: Example Publish#' \
-            -e 's#gh-workflow/multiarch-image-publish@main#gh-workflow/multiarch-image-publish@0.2.2#' \
+            -e 's#gh-workflow/multiarch-image-publish@main#gh-workflow/multiarch-image-publish@0.2.3#' \
             .github/workflows/example-main.yml > /tmp/example-main.normalized.yml
           diff -u .github/workflows/example.yml /tmp/example-main.normalized.yml
 
@@ -53,7 +53,7 @@ jobs:
         run: |
           sed \
             -e 's#name: Example Publish Docker Hub Main#name: Example Publish Docker Hub#' \
-            -e 's#gh-workflow/multiarch-image-publish@main#gh-workflow/multiarch-image-publish@0.2.2#' \
+            -e 's#gh-workflow/multiarch-image-publish@main#gh-workflow/multiarch-image-publish@0.2.3#' \
             .github/workflows/example-dockerhub-main.yml > /tmp/example-dockerhub-main.normalized.yml
           diff -u .github/workflows/example-dockerhub.yml /tmp/example-dockerhub-main.normalized.yml
 
