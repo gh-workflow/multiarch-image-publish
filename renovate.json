@@ -1,24 +1,22 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended",
-    "helpers:pinGitHubActionDigests"
-  ],
-  "labels": [
-    "dependencies"
-  ],
+  "extends": ["schedule:weekly"],
+  "enabledManagers": ["github-actions", "pep621", "pip_requirements"],
+  "labels": ["dependencies"],
   "packageRules": [
     {
-      "matchManagers": [
-        "github-actions"
-      ],
-      "groupName": "GitHub Actions"
+      "matchManagers": ["github-actions"],
+      "groupName": "github-actions"
     },
     {
-      "matchManagers": [
-        "pip_requirements"
-      ],
-      "groupName": "Python dependencies"
+      "matchManagers": ["pep621", "pip_requirements"],
+      "groupName": "pip"
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": ["gh-workflow/multiarch-image-publish"],
+      "matchCurrentValue": "main",
+      "pinDigests": false
     }
   ]
 }
