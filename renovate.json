@@ -1,6 +1,5 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["schedule:weekly"],
   "enabledManagers": ["github-actions", "pep621", "pip_requirements"],
   "labels": ["dependencies"],
   "packageRules": [
