@@ -1,7 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["schedule:weekly"],
-  "enabledManagers": ["github-actions", "pep621", "pip-compile", "pip_requirements", "pip_setup", "pipenv", "poetry", "setup-cfg"],
+  "enabledManagers": ["github-actions", "pep621", "pip_requirements"],
   "labels": ["dependencies"],
   "packageRules": [
     {
@@ -9,7 +9,7 @@
       "groupName": "github-actions"
     },
     {
-      "matchManagers": ["pep621", "pip-compile", "pip_requirements", "pip_setup", "pipenv", "poetry", "setup-cfg"],
+      "matchManagers": ["pep621", "pip_requirements"],
       "groupName": "pip"
     }
   ]
