@@ -1,8 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["schedule:weekly"],
   "enabledManagers": ["github-actions", "pep621", "pip-compile", "pip_requirements", "pip_setup", "pipenv", "poetry", "setup-cfg"],
   "labels": ["dependencies"],
-  "schedule": ["before 5am on monday"],
   "packageRules": [
     {
       "matchManagers": ["github-actions"],
