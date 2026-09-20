@@ -11,12 +11,6 @@
     {
       "matchManagers": ["pep621", "pip_requirements"],
       "groupName": "pip"
-    },
-    {
-      "matchManagers": ["github-actions"],
-      "matchPackageNames": ["gh-workflow/multiarch-image-publish"],
-      "matchCurrentValue": "main",
-      "pinDigests": false
     }
   ]
 }
