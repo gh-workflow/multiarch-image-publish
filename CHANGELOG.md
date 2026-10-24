@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-10-24
+
+### Internal
+
+- Expanded test-suite CI coverage to Python 3.10 through 3.14 and updated linting CI to Python 3.15.
+- Updated GitHub Actions dependencies, including the regctl installer, artifact upload, and immutable-action
+  reference check.
+- Updated development dependencies for pymarkdownlnt and ruff.
+- Added Renovate configuration and adjusted Dependabot cooldown settings for dependency updates.
+
 ## [0.2.3] - 2026-09-19
 
 ### Changed
