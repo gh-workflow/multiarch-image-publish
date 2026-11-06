@@ -3,7 +3,7 @@
 pyright>=1.1.414,<2
 pymarkdownlnt>=0.9.41,<1
 pygments>=2.21.0,<3
-pytest>=9.1.1,<10
+pytest>=9.2.0,<10
 pytest-cov>=7.1.0,<8
-ruff>=0.17.2,<1
+ruff>=0.17.3,<1
 yamllint>=1.38.0,<2
