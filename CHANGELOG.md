@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-11-22
+
+### Internal
+
+- Updated helper GitHub Actions.
+- Updated development dependencies.
+- Drop Python 3.10 (EOL 2026-10-01) from the CI test-suite matrix.
+
 ## [0.2.5] - 2026-10-24
 
 ### Internal
